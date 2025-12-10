@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Heart, MessageCircle, Gift, Bell, Sparkles, Smile, Frown, Meh, Megaphone, X, Send, Settings, ChevronRight, LogOut, Image as ImageIcon, Coins, Pencil, Trash2, Loader2, Lock, Clock, Award, Wallet, Building2, CornerDownRight, Link as LinkIcon, MapPin, Search } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 // --- [필수] Supabase 설정 ---
 // 주의: 배포 시에는 보안을 위해 이 값들을 환경 변수(process.env...)로 변경하는 것이 좋습니다.
@@ -912,22 +913,9 @@ export default function App() {
 
   useEffect(() => {
     // Supabase 라이브러리 로드
-    if (window.supabase) {
-        initSupabase();
-        return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    script.onload = initSupabase;
-    document.body.appendChild(script);
-  }, []);
-
-  const initSupabase = () => {
-    if (!window.supabase) return;
-    const { createClient } = window.supabase;
     const client = createClient(SUPABASE_URL, SUPABASE_KEY);
     setSupabase(client);
-  };
+  }, []);
   
   // 생일 팝업 확인 로직
   const checkBirthday = useCallback((user) => {
