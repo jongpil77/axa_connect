@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Heart, MessageCircle, Gift, Bell, Sparkles, Smile, Frown, Meh, Megaphone, X, Send, Settings, ChevronRight, LogOut, Image as ImageIcon, Coins, Pencil, Trash2, Loader2, Lock, Clock, Award, Wallet, Building2, CornerDownRight, Link as LinkIcon, MapPin, Search } from 'lucide-react';
+import { User, Heart, MessageCircle, Gift, Bell, Sparkles, Smile, Frown, Meh, Megaphone, X, Send, Settings, ChevronRight, LogOut, Image as ImageIcon, Coins, Pencil, Trash2, Loader2, Lock, Clock, Award, Wallet, Building2, CornerDownRight, Link as LinkIcon, MapPin, Search, Key, Users, Edit3 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- [필수] Supabase 설정 ---
-// 주의: 배포 시에는 보안을 위해 이 값들을 환경 변수(process.env...)로 변경하는 것이 좋습니다.
-// 현재 미리보기 환경 작동을 위해 하드코딩된 값을 사용합니다.
 const SUPABASE_URL = 'https://clsvsqiikgnreqqvcrxj.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsc3ZzcWlpa2ducmVxcXZjcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNzcyNjAsImV4cCI6MjA4MDk1MzI2MH0.lsaycyp6tXjLwb-qB5PIQ0OqKweTWO3WaxZG5GYOUqk';
 
@@ -34,20 +32,18 @@ const ADMIN_EMAIL = "jongpil.kim@axa.co.kr";
 // --- Helper Functions ---
 const formatName = (name) => {
   if (!name) return '';
-  // 한국어 이름의 경우 성(첫 글자)을 제외하고 반환
   if (/[가-힣]{2,}/.test(name)) {
       return name.substring(1); 
   }
   return name; 
 };
 
-// 이름의 첫 글자만 반환
 const formatInitial = (name) => {
     if (!name) return '';
     return name.charAt(0);
 };
 
-// 주간 생일자 목록 계산
+// 주간 생일자 목록 계산 (양력/음력 표시 추가)
 const getWeeklyBirthdays = (profiles) => {
     if (!profiles || profiles.length === 0) return { current: [], next: [] };
 
@@ -83,20 +79,22 @@ const getWeeklyBirthdays = (profiles) => {
              normalizedBirthDate = normalizeDate(nextYearBirthDate);
         }
         
+        // calendar_type에 따른 라벨 설정
+        const typeLabel = p.calendar_type === 'lunar' ? '(-)' : '(+)';
+
         // 이번 주 생일
         if (normalizedBirthDate >= normalizedToday && normalizedBirthDate < normalizeDate(endOfCurrentWeek)) {
-             currentBirthdays.push({ name: p.name, date: `${m}/${d}` });
+             currentBirthdays.push({ name: p.name, date: `${m}/${d}`, typeLabel });
         } 
         // 다음 주 생일
         else if (normalizedBirthDate >= normalizeDate(endOfCurrentWeek) && normalizedBirthDate < normalizeDate(endOfNextWeek)) {
-             nextBirthdays.push({ name: p.name, date: `${m}/${d}` });
+             nextBirthdays.push({ name: p.name, date: `${m}/${d}`, typeLabel });
         }
     });
 
     return { current: currentBirthdays, next: nextBirthdays };
 };
 
-// 금일 작성 여부 확인 헬퍼
 const isToday = (timestamp) => {
     if (!timestamp) return false;
     const date = new Date(timestamp);
@@ -108,13 +106,25 @@ const isToday = (timestamp) => {
 
 // --- Sub Components ---
 
+// 4. 출석체크 기분 토스트 팝업 컴포넌트
+const MoodToast = ({ message, emoji, visible }) => {
+    if (!visible) return null;
+    return (
+        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-up w-[90%] max-w-sm">
+            <div className="bg-slate-800/90 backdrop-blur-sm text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700">
+                <span className="text-3xl">{emoji}</span>
+                <span className="text-sm font-bold leading-relaxed">{message}</span>
+            </div>
+        </div>
+    );
+};
+
 const AuthForm = ({ isSignupMode, setIsSignupMode, handleLogin, handleSignup, loading }) => {
   const [selectedDept, setSelectedDept] = useState('');
   const [birthdate, setBirthdate] = useState('');
   const [calendarType, setCalendarType] = useState('solar'); 
 
   return (
-    // 테마: 배경색을 밝은 파스텔톤으로
     <div className="min-h-screen bg-blue-50 flex justify-center items-center p-6">
       <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl p-8 border border-blue-100 animate-fade-in relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-blue-400 to-blue-600"></div>
@@ -128,7 +138,6 @@ const AuthForm = ({ isSignupMode, setIsSignupMode, handleLogin, handleSignup, lo
           <form onSubmit={handleSignup} className="space-y-4">
             <div><label className="block text-xs font-bold text-slate-500 mb-1 ml-1">이름</label><input name="name" type="text" placeholder="홍길동" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm focus:border-blue-500 transition-colors" required /></div>
             
-            {/* 생년월일 음력/양력 선택 */}
             <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">생년월일</label>
                 <div className="flex gap-2">
@@ -161,7 +170,6 @@ const AuthForm = ({ isSignupMode, setIsSignupMode, handleLogin, handleSignup, lo
               </div>
             </div>
             <div>
-              {/* 관리자 코드 숨김 처리 (type="password") 및 안내 문구 수정 */}
               <p className="text-[10px] text-slate-400 mb-1 ml-1">⚠️ 관리자 권한 부여 시에만 인증 코드 입력 (일반 사용자는 공란)</p>
               <input name="code" type="password" placeholder="인증 코드 (선택)" className="w-full p-3.5 bg-white border-2 border-slate-100 rounded-2xl outline-none text-sm text-slate-800 placeholder-slate-300 focus:border-blue-500" />
             </div>
@@ -183,13 +191,13 @@ const AuthForm = ({ isSignupMode, setIsSignupMode, handleLogin, handleSignup, lo
   );
 };
 
-const Header = ({ currentUser, onOpenUserInfo, handleLogout, handleChangePasswordClick }) => {
+// Header: 메뉴 확장 (소속 변경, 비밀번호 변경, 관리자 포인트 지급)
+const Header = ({ currentUser, onOpenUserInfo, handleLogout, onOpenChangeDept, onOpenChangePwd, onOpenAdminGrant }) => {
   const todayDate = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const [showSettings, setShowSettings] = useState(false);
   const displayName = formatName(currentUser?.name);
   
   return (
-    // 테마 수정: 헤더 배경색은 유지
     <div className="bg-white/80 backdrop-blur-md p-4 sticky top-0 z-30 border-b border-slate-100 shadow-sm">
       <div className="text-[10px] text-blue-400 font-bold mb-1 pl-1">{todayDate}</div>
       <div className="flex justify-between items-center">
@@ -212,13 +220,25 @@ const Header = ({ currentUser, onOpenUserInfo, handleLogout, handleChangePasswor
           <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors relative z-40"><Settings className="w-5 h-5 text-slate-400" /></button>
           
           {showSettings && (
-             <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden z-50 animate-fade-in">
-                {/* 비밀번호 초기화 */}
-                <button onClick={handleChangePasswordClick} className="flex items-center gap-2 w-full p-3 text-sm text-slate-600 hover:bg-slate-50 border-b border-slate-50 transition-colors">
-                   <Lock className="w-4 h-4 text-blue-400"/> 비밀번호 초기화
+             <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden z-50 animate-fade-in">
+                {/* 1. 소속 변경 */}
+                <button onClick={() => { setShowSettings(false); onOpenChangeDept(); }} className="flex items-center gap-2 w-full p-3 text-xs text-slate-600 hover:bg-slate-50 border-b border-slate-50 transition-colors">
+                   <Edit3 className="w-3.5 h-3.5 text-blue-400"/> 소속/팀 변경
                 </button>
-                <button onClick={handleLogout} className="flex items-center gap-2 w-full p-3 text-sm text-red-400 hover:bg-red-50 transition-colors">
-                   <LogOut className="w-4 h-4"/> 로그아웃
+                {/* 1. 비밀번호 변경 */}
+                <button onClick={() => { setShowSettings(false); onOpenChangePwd(); }} className="flex items-center gap-2 w-full p-3 text-xs text-slate-600 hover:bg-slate-50 border-b border-slate-50 transition-colors">
+                   <Key className="w-3.5 h-3.5 text-blue-400"/> 비밀번호 변경
+                </button>
+                
+                {/* 2. 관리자용 포인트 지급 */}
+                {currentUser?.role === 'admin' && (
+                    <button onClick={() => { setShowSettings(false); onOpenAdminGrant(); }} className="flex items-center gap-2 w-full p-3 text-xs text-blue-600 font-bold hover:bg-blue-50 border-b border-slate-50 transition-colors">
+                        <Gift className="w-3.5 h-3.5 text-blue-500"/> 포인트 지급 (관리자)
+                    </button>
+                )}
+
+                <button onClick={handleLogout} className="flex items-center gap-2 w-full p-3 text-xs text-red-400 hover:bg-red-50 transition-colors">
+                   <LogOut className="w-3.5 h-3.5"/> 로그아웃
                 </button>
              </div>
           )}
@@ -226,6 +246,96 @@ const Header = ({ currentUser, onOpenUserInfo, handleLogout, handleChangePasswor
       </div>
     </div>
   );
+};
+
+// 1. 소속 변경 모달
+const ChangeDeptModal = ({ onClose, onSave }) => {
+    const [dept, setDept] = useState('');
+    const [team, setTeam] = useState('');
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400"><X className="w-5 h-5"/></button>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Building2 className="w-5 h-5"/> 소속 변경</h3>
+                <div className="space-y-3">
+                    <select className="w-full p-3 bg-slate-50 rounded-xl text-sm border border-slate-200 outline-none" onChange={(e) => setDept(e.target.value)}>
+                        <option value="">본부/부문 선택</option>
+                        {Object.keys(ORGANIZATION).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <select className="w-full p-3 bg-slate-50 rounded-xl text-sm border border-slate-200 outline-none" disabled={!dept} onChange={(e) => setTeam(e.target.value)}>
+                        <option value="">팀 선택</option>
+                        {dept && ORGANIZATION[dept].map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <button onClick={() => onSave(dept, team)} disabled={!dept || !team} className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-slate-300 transition-colors">변경 저장</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 1. 비밀번호 변경 모달
+const ChangePasswordModal = ({ onClose, onSave }) => {
+    const [password, setPassword] = useState('');
+    const isValid = password.length >= 6 && /^\d+$/.test(password);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400"><X className="w-5 h-5"/></button>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Key className="w-5 h-5"/> 비밀번호 변경</h3>
+                <div className="space-y-3">
+                    <input 
+                        type="password" 
+                        placeholder="새 비밀번호 (6자리 이상 숫자)" 
+                        className="w-full p-3 bg-slate-50 rounded-xl text-sm border border-slate-200 outline-none"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+                    {!isValid && password.length > 0 && <p className="text-[10px] text-red-500">6자리 이상 숫자로 입력해주세요.</p>}
+                    <button onClick={() => onSave(password)} disabled={!isValid} className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-slate-300 transition-colors">비밀번호 변경</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 2. 관리자 포인트 지급 모달
+const AdminGrantModal = ({ onClose, onGrant, profiles }) => {
+    const [dept, setDept] = useState('');
+    const [targetUser, setTargetUser] = useState('');
+    const [amount, setAmount] = useState('');
+
+    const filteredUsers = profiles.filter(p => p.dept === dept);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400"><X className="w-5 h-5"/></button>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-blue-600"><Gift className="w-5 h-5"/> 특별 포인트 지급</h3>
+                <div className="space-y-3">
+                    <select className="w-full p-3 bg-slate-50 rounded-xl text-sm border border-slate-200 outline-none" onChange={(e) => { setDept(e.target.value); setTargetUser(''); }}>
+                        <option value="">소속 선택</option>
+                        {Object.keys(ORGANIZATION).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <select className="w-full p-3 bg-slate-50 rounded-xl text-sm border border-slate-200 outline-none" disabled={!dept} onChange={(e) => setTargetUser(e.target.value)}>
+                        <option value="">직원 선택</option>
+                        {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.name} ({u.team})</option>)}
+                    </select>
+                    <input 
+                        type="number" 
+                        placeholder="지급 포인트 (숫자만 입력)" 
+                        className="w-full p-3 bg-slate-50 rounded-xl text-sm border border-slate-200 outline-none font-bold"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                    />
+                    <button onClick={() => onGrant(targetUser, amount)} disabled={!targetUser || !amount} className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-xl font-bold hover:shadow-lg disabled:opacity-50 transition-all">
+                        포인트 지급하기
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const UserInfoModal = ({ currentUser, pointHistory, setShowUserInfoModal, handleRedeemPoints }) => (
@@ -353,8 +463,9 @@ const BirthdayNotifier = ({ weeklyBirthdays }) => {
                             <div key={index} className="flex items-center gap-2 p-2 bg-blue-100/50 border border-blue-100 rounded-xl">
                                 <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-xs shadow-sm">🎂</div>
                                 <div>
+                                    {/* 3. 양력(+)/음력(-) 표시 추가 */}
                                     <p className="text-xs font-bold text-slate-700">{b.name}</p>
-                                    <p className="text-[10px] text-slate-400">{b.date}</p>
+                                    <p className="text-[10px] text-slate-400">{b.date} <span className="text-blue-500 font-bold">{b.typeLabel}</span></p>
                                 </div>
                             </div>
                         ))}
@@ -380,6 +491,24 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, onWriteClick, onNavigateToNews,
     const handleSectionClick = (type) => {
         onNavigateToFeed(type); // 섹션 클릭 시 필터링하여 FeedTab으로 이동 (이전 요청 로직)
     };
+
+    // 5. 기분 선택 시 스타일 처리 함수
+    const getMoodButtonStyle = (type) => {
+        if (mood === type) {
+            // 선택된 항목: 기존 색상 유지
+            if (type === 'happy') return 'bg-blue-500 border-blue-600 text-white shadow-md scale-105 ring-2 ring-blue-200';
+            if (type === 'soso') return 'bg-yellow-400 border-yellow-500 text-white shadow-md scale-105 ring-2 ring-yellow-200';
+            if (type === 'sad') return 'bg-orange-500 border-orange-600 text-white shadow-md scale-105 ring-2 ring-orange-200';
+        } else if (mood) {
+            // 다른게 선택되었을 때: 회색 처리
+            return 'bg-slate-100 border-slate-200 text-slate-300';
+        } else {
+            // 아무것도 선택 안되었을 때: 기본 색상
+            if (type === 'happy') return 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 opacity-90';
+            if (type === 'soso') return 'bg-yellow-400 border-yellow-400 text-white hover:bg-yellow-500 opacity-90';
+            if (type === 'sad') return 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600 opacity-90';
+        }
+    };
     
     return (
       <div className="p-5 space-y-6 pb-32 animate-fade-in relative bg-blue-50 min-h-full">
@@ -398,8 +527,7 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, onWriteClick, onNavigateToNews,
                   <div className="flex gap-2 h-full mt-2">
                     <button 
                       onClick={() => handleMoodCheck('happy')} 
-                      className={`flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all active:scale-90 duration-200 border 
-                      ${mood === 'happy' ? 'bg-blue-500 border-blue-600 text-white shadow-md scale-105 ring-2 ring-blue-200' : 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 opacity-90'}`}
+                      className={`flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all active:scale-90 duration-200 border ${getMoodButtonStyle('happy')}`}
                       disabled={!!mood}
                     >
                       <Smile className="w-5 h-5"/>
@@ -407,8 +535,7 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, onWriteClick, onNavigateToNews,
                     </button>
                     <button 
                       onClick={() => handleMoodCheck('soso')} 
-                      className={`flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all active:scale-90 duration-200 border 
-                      ${mood === 'soso' ? 'bg-yellow-400 border-yellow-500 text-white shadow-md scale-105 ring-2 ring-yellow-200' : 'bg-yellow-400 border-yellow-400 text-white hover:bg-yellow-500 opacity-90'}`}
+                      className={`flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all active:scale-90 duration-200 border ${getMoodButtonStyle('soso')}`}
                       disabled={!!mood}
                     >
                       <Meh className="w-5 h-5"/>
@@ -416,8 +543,7 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, onWriteClick, onNavigateToNews,
                     </button>
                     <button 
                       onClick={() => handleMoodCheck('sad')} 
-                      className={`flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all active:scale-90 duration-200 border 
-                      ${mood === 'sad' ? 'bg-orange-500 border-orange-600 text-white shadow-md scale-105 ring-2 ring-orange-200' : 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600 opacity-90'}`}
+                      className={`flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all active:scale-90 duration-200 border ${getMoodButtonStyle('sad')}`}
                       disabled={!!mood}
                     >
                       <Frown className="w-5 h-5"/>
@@ -462,6 +588,13 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, onWriteClick, onNavigateToNews,
                  <div className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center"><Coins className="w-2.5 h-2.5 text-yellow-300 fill-yellow-300 mr-0.5"/>100P</div>
             </button>
         </div>
+
+        {/* 6. 칭찬합시다 섹션 바로 위 텍스트 추가 */}
+        <div className="flex items-center justify-center gap-1.5 py-1 bg-blue-100/50 rounded-lg text-blue-600 text-[10px] font-bold mx-1 border border-blue-100">
+            <Coins className="w-3 h-3 text-yellow-500 fill-yellow-500"/>
+            게시물 1개 작성시, +100P (일 최대 300P 가능)
+        </div>
+
         <div className="grid grid-cols-2 gap-4 min-h-[300px]">
             {/* 칭찬합시다 섹션 */}
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-blue-100 cursor-pointer" onClick={() => handleSectionClick('praise')}>
@@ -906,6 +1039,13 @@ export default function App() {
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [showUserInfoModal, setShowUserInfoModal] = useState(false);
   const [showBirthdayPopup, setShowBirthdayPopup] = useState(false);
+  
+  // 모달 상태 추가
+  const [showChangeDeptModal, setShowChangeDeptModal] = useState(false);
+  const [showChangePwdModal, setShowChangePwdModal] = useState(false);
+  const [showAdminGrantModal, setShowAdminGrantModal] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', emoji: '' });
+
   const [activeTab, setActiveTab] = useState('home');
   const [activeFeedFilter, setActiveFeedFilter] = useState('all');
   const [mood, setMood] = useState(null);
@@ -919,7 +1059,6 @@ export default function App() {
   
   // 생일 팝업 확인 로직
   const checkBirthday = useCallback((user) => {
-    // 포인트를 이미 받았거나 생일이 없으면 팝업을 띄우지 않음
     if (!user.birthdate || user.birthday_granted) return; 
     
     const today = new Date();
@@ -930,7 +1069,6 @@ export default function App() {
     const [_, m, d] = user.birthdate.split('-').map(Number);
     const birthMonth = m;
 
-    // 현재 월이 생일 월과 일치하면 팝업 활성화
     if (currentMonth === birthMonth) {
         setShowBirthdayPopup(true);
     }
@@ -947,8 +1085,6 @@ export default function App() {
         // 마지막 출석일이 오늘이면 mood 상태 업데이트
         if (data.last_attendance === todayStr) setMood('checked');
         
-        // 로그인 시 생일 체크 및 팝업 활성화
-        // checkBirthday는 useCallback에 의존성이 포함되어 있으므로 여기서 호출합니다.
         checkBirthday(data);
         }
     } catch (err) { console.error(err); }
@@ -967,69 +1103,49 @@ export default function App() {
   const fetchFeeds = useCallback(async () => {
     if (!supabase) return; 
     try {
-        // 게시글 정보 (작성자 프로필 join)
         const { data: posts } = await supabase.from('posts').select(`*, profiles:author_id (name, dept, team, role)`).order('created_at', { ascending: false });
-        // 댓글 정보 (작성자 프로필 join)
         const { data: comments } = await supabase.from('comments').select(`*, profiles:author_id (name, role)`).order('created_at', { ascending: true });
 
         if (posts) {
-            // 댓글 트리 구조 생성 함수 (현재는 계층 구조 없이 1레벨만 표시)
             const buildCommentTree = (postComments) => {
                 const commentMap = {};
                 const rootComments = [];
-                
-                postComments.forEach(c => {
-                    commentMap[c.id] = { ...c, replies: [] };
-                });
-                
-                postComments.forEach(c => {
-                    // 댓글은 전부 루트 댓글로 간주하고 정렬 순서대로 유지
-                    rootComments.push(commentMap[c.id]);
-                });
+                postComments.forEach(c => { commentMap[c.id] = { ...c, replies: [] }; });
+                postComments.forEach(c => { rootComments.push(commentMap[c.id]); });
                 return rootComments;
             };
 
             const formatted = posts.map(post => {
                 const postComments = comments ? comments.filter(c => c.post_id === post.id) : [];
                 
-                // 작성일자 + 작성 시간 포맷팅
                 const createdDate = new Date(post.created_at);
                 const formattedTime = createdDate.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
+                    year: 'numeric', month: '2-digit', day: '2-digit',
                 }).replace(/\. /g, '.').replace(/\./g, '/').slice(0, -1) + ' ' + createdDate.toLocaleTimeString('ko-KR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                }).replace(' ', ''); // 'YYYY/MM/DD HH:MM' 형식
+                    hour: '2-digit', minute: '2-digit', hour12: false,
+                }).replace(' ', ''); 
 
                 return {
                     ...post,
                     author: post.profiles?.name || '알 수 없음',
                     team: post.profiles?.team,
-                    time: new Date(post.created_at).toLocaleDateString(), // 레거시 필드 유지
-                    formattedTime: formattedTime, // 새 필드 추가
+                    time: new Date(post.created_at).toLocaleDateString(), 
+                    formattedTime: formattedTime, 
                     likes: post.likes ? (typeof post.likes === 'string' ? JSON.parse(post.likes) : post.likes) : [], 
                     isLiked: false,
-                    comments: buildCommentTree(postComments), // 트리 구조 댓글
-                    totalComments: postComments.length // 전체 댓글 수
+                    comments: buildCommentTree(postComments), 
+                    totalComments: postComments.length 
                 };
             });
             
-            // 현재 로그인된 사용자의 좋아요 상태 반영
             if (currentUser) {
-                formatted.forEach(p => {
-                    // 좋아요 상태 업데이트 (DB 데이터와 현재 사용자 비교)
-                    p.isLiked = p.likes.includes(currentUser.id);
-                });
+                formatted.forEach(p => { p.isLiked = p.likes.includes(currentUser.id); });
             }
             setFeeds(formatted);
         }
     } catch (err) { console.error(err); }
   }, [supabase, currentUser]);
 
-  // 전체 프로필 목록 불러오기 (랭킹 등에 사용)
   const fetchProfiles = useCallback(async () => {
     if (!supabase) return; 
     try {
@@ -1038,22 +1154,15 @@ export default function App() {
     } catch (err) { console.error(err); }
   }, [supabase]);
 
-  // 메인 데이터 구독 및 초기 인증
   useEffect(() => {
     if (!supabase) return; 
 
-    // Realtime 구독 (댓글/게시글 변경 감지 시 즉시 반영)
     const channel = supabase.channel('public:comments_posts')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => {
-            fetchFeeds();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
-            fetchFeeds();
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => { fetchFeeds(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => { fetchFeeds(); })
         .subscribe();
 
     try {
-        // 초기 세션 확인
         supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
         if (session) {
@@ -1062,7 +1171,6 @@ export default function App() {
         }
         });
 
-        // 인증 상태 변화 감지
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);
         if (session) {
@@ -1078,60 +1186,41 @@ export default function App() {
             subscription.unsubscribe();
             supabase.removeChannel(channel);
         };
-    } catch(err) {
-        console.error("Supabase init error:", err);
-    }
+    } catch(err) { console.error("Supabase init error:", err); }
   }, [supabase, fetchFeeds, fetchPointHistory, fetchProfiles, fetchUserData]);
 
-  // Supabase 설정 확인 (하드코딩된 값 사용 중인지 체크)
   const checkSupabaseConfig = () => {
     if (!supabase) return false;
-    if (SUPABASE_URL.includes('your-project-url')) return false; // 예시 값 방지
+    if (SUPABASE_URL.includes('your-project-url')) return false; 
     return true;
   };
   
-  // 생일 축하 포인트 지급
   const handleBirthdayGrant = async () => {
     if (!currentUser || !checkSupabaseConfig()) return;
     try {
         const newPoints = (currentUser.points || 0) + 1000;
         await supabase.from('profiles').update({ points: newPoints, birthday_granted: true }).eq('id', currentUser.id);
         await supabase.from('point_history').insert({ user_id: currentUser.id, reason: '생일 축하 포인트', amount: 1000, type: 'earn' });
-        // alert('생일 축하 포인트 1,000P가 지급되었습니다! 🎉'); // alert 대신 커스텀 모달 사용 권장
         setShowBirthdayPopup(false);
         fetchUserData(currentUser.id);
         fetchPointHistory(currentUser.id);
     } catch (err) { console.error('오류 발생: ', err.message); }
   };
 
-  // 1. 좋아요 토글 로직
   const handleLikePost = async (postId, currentLikes, isLiked) => {
       if (!currentUser || !checkSupabaseConfig()) return;
       const userId = currentUser.id;
       let newLikes = [...currentLikes];
 
-      // 좋아요를 이미 눌렀다면 (취소)
-      if (isLiked) {
-          newLikes = newLikes.filter(id => id !== userId);
-      } 
-      // 좋아요를 누르지 않았다면 (등록)
-      else {
-          newLikes.push(userId);
-      }
+      if (isLiked) { newLikes = newLikes.filter(id => id !== userId); } 
+      else { newLikes.push(userId); }
       
-      // Optimistic Update (UI 즉시 반영)
       setFeeds(feeds.map(f => f.id === postId ? { ...f, likes: newLikes, isLiked: !isLiked } : f));
       
-      // DB 업데이트
-      try { 
-          await supabase.from('posts').update({ likes: newLikes }).eq('id', postId); 
-      } catch (err) { 
-          console.error(err); 
-          fetchFeeds(); // 실패 시 롤백 (데이터 다시 가져오기)
-      }
+      try { await supabase.from('posts').update({ likes: newLikes }).eq('id', postId); } 
+      catch (err) { console.error(err); fetchFeeds(); }
   };
 
-  // 댓글 추가
   const handleAddComment = async (e, postId, parentId = null) => {
       e.preventDefault();
       const content = e.target.commentContent.value;
@@ -1139,18 +1228,13 @@ export default function App() {
       
       try {
           await supabase.from('comments').insert({ 
-              post_id: postId, 
-              author_id: currentUser.id, 
-              content: content,
-              parent_id: parentId // 대댓글인 경우 부모 ID 저장
+              post_id: postId, author_id: currentUser.id, content: content, parent_id: parentId 
           });
           e.target.reset();
-          // 실시간 기능이 작동하더라도 안전하게 한 번 더 fetch
           setTimeout(fetchFeeds, 500); 
       } catch (err) { console.error('댓글 작성 실패: ', err.message); }
   };
   
-  // 댓글 삭제
   const handleDeleteComment = async (commentId) => {
       if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
       try {
@@ -1159,7 +1243,6 @@ export default function App() {
       } catch (err) { console.error('삭제 실패: ', err.message); }
   };
 
-  // 게시글 삭제 (포인트 회수 로직 포함)
   const handleDeletePost = async (postId) => {
     if (!currentUser) return;
     const postToDelete = feeds.find(f => f.id === postId);
@@ -1175,7 +1258,6 @@ export default function App() {
         const { error } = await supabase.from('posts').delete().eq('id', postId);
         if (error) throw error;
         
-        // 포인트 회수 (칭찬, 꿀팁, 맛집 게시글만 해당)
         if (['praise', 'knowhow', 'matjib'].includes(postToDelete.type)) {
             const newPoints = Math.max(0, currentUser.points - 100); 
             await supabase.from('profiles').update({ points: newPoints }).eq('id', currentUser.id);
@@ -1185,46 +1267,33 @@ export default function App() {
             else if (postToDelete.type === 'knowhow') reasonText = '게시글 삭제(꿀팁) - 회수';
             else if (postToDelete.type === 'matjib') reasonText = '게시글 삭제(맛집) - 회수';
 
-            await supabase.from('point_history').insert({ 
-                user_id: currentUser.id, 
-                reason: reasonText, 
-                amount: 100, 
-                type: 'use' 
-            });
+            await supabase.from('point_history').insert({ user_id: currentUser.id, reason: reasonText, amount: 100, type: 'use' });
             fetchUserData(currentUser.id); 
         }
-
-        // alert('삭제되었습니다.'); // alert 대신 커스텀 모달 사용 권장
         fetchFeeds();
     } catch (err) { console.error('삭제 실패: ', err.message); }
   };
 
-  // 포인트 상품권 교환 신청
   const handleRedeemPoints = async () => {
     if (!currentUser || currentUser.points < 10000) return;
     if (!window.confirm('10,000P를 사용하여 포인트 차감 신청을 하시겠습니까?')) return;
     try {
-        // 1. 신청 내역 DB 기록
         await supabase.from('redemption_requests').insert({ user_id: currentUser.id, user_name: currentUser.name, amount: 10000 });
         
-        // 2. 포인트 차감 및 히스토리 기록
         const newPoints = currentUser.points - 10000;
         await supabase.from('profiles').update({ points: newPoints }).eq('id', currentUser.id);
         await supabase.from('point_history').insert({ user_id: currentUser.id, reason: '포인트 차감 신청', amount: 10000, type: 'use' });
         
-        // 3. 관리자에게 메일 발송 (이 부분은 실제로 작동하지 않을 수 있습니다. 웹 환경에 따라 mailto만 사용)
         const subject = encodeURIComponent(`[AXA Connect] 포인트 차감 신청 - ${currentUser.name}`);
         const body = encodeURIComponent(`사용자: ${currentUser.name} (${currentUser.email})\n신청 포인트: 10,000P\n\n처리 부탁드립니다.`);
         window.location.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
         
-        // alert('신청이 완료되었습니다.'); // alert 대신 커스텀 모달 사용 권장
         fetchUserData(currentUser.id);
         fetchPointHistory(currentUser.id);
         setShowUserInfoModal(false);
     } catch (err) { console.error('신청 실패: ', err.message); }
   };
 
-  // 로그인 처리
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!checkSupabaseConfig()) return;
@@ -1237,35 +1306,25 @@ export default function App() {
     } catch (err) { console.error('로그인 실패: ', err.message); } finally { setLoading(false); }
   };
 
-  // 회원가입 처리
   const handleSignup = async (e) => {
     e.preventDefault();
     if (!checkSupabaseConfig()) return;
     setLoading(true);
-    // 회원가입 필드: calendarType 추가됨
     const { name, email, password, dept, team, code, birthdate, calendarType } = e.target;
     let role = 'member';
     if (code.value === 'admin2026') role = 'admin';
     else if (code.value && code.value !== 'admin2026') { alert('잘못된 인증 코드입니다.'); setLoading(false); return; }
     try {
         const initialData = { 
-            name: name.value, 
-            dept: dept.value, 
-            team: team.value, 
-            role: role, 
-            points: INITIAL_POINTS, 
-            birthdate: birthdate.value,
-            calendar_type: calendarType.value // DB 저장
+            name: name.value, dept: dept.value, team: team.value, role: role, points: INITIAL_POINTS, 
+            birthdate: birthdate.value, calendar_type: calendarType.value 
         };
         const { data: signUpResult, error } = await supabase.auth.signUp({ email: email.value, password: password.value, options: { data: initialData } });
         if (error) throw error;
-        // 초기 포인트 지급
         await supabase.from('point_history').insert({ user_id: signUpResult.user.id, reason: '최초 가입 포인트', amount: INITIAL_POINTS, type: 'earn' });
-        // alert('가입 완료! 자동 로그인됩니다.'); // alert 대신 커스텀 모달 사용 권장
     } catch (err) { console.error('가입 실패: ', err.message); } finally { setLoading(false); }
   };
 
-  // 게시글 작성 처리 (이미지 업로드 및 포인트 지급 포함)
   const handlePostSubmit = async (e) => {
     e.preventDefault();
     if (!currentUser || !checkSupabaseConfig()) return;
@@ -1296,16 +1355,8 @@ export default function App() {
         }
 
         const { error: postError } = await supabase.from('posts').insert({
-            content: content, 
-            type: category, 
-            author_id: currentUser.id, 
-            image_url: publicImageUrl, 
-            target_name: targetName,
-            title: title,
-            region_main: regionMain,
-            region_sub: regionSub,
-            link_url: linkUrl,
-            likes: [] 
+            content: content, type: category, author_id: currentUser.id, image_url: publicImageUrl, 
+            target_name: targetName, title: title, region_main: regionMain, region_sub: regionSub, link_url: linkUrl, likes: [] 
         });
 
         if (postError) throw postError;
@@ -1320,9 +1371,6 @@ export default function App() {
             else if (category === 'matjib') reasonText = '게시글 작성(맛집소개)';
 
             await supabase.from('point_history').insert({ user_id: currentUser.id, reason: reasonText, amount: rewardPoints, type: 'earn' });
-            // alert(`등록되었습니다! (+${rewardPoints}P)`); // alert 대신 커스텀 모달 사용 권장
-        } else {
-             // alert('등록되었습니다.'); // alert 대신 커스텀 모달 사용 권장
         }
         setShowWriteModal(false);
         fetchFeeds();
@@ -1330,21 +1378,37 @@ export default function App() {
     } catch (err) { console.error('작성 실패: ', err.message); }
   };
 
-  // 오늘의 기분 (출석 체크)
+  // 4. 오늘의 기분 (출석 체크) - 팝업 기능 추가
   const handleMoodCheck = async (selectedMood) => {
     if (mood || !checkSupabaseConfig()) return;
     setMood(selectedMood);
+    
+    // 기분에 따른 메시지와 이모지 설정
+    let message = "";
+    let emoji = "";
+    if (selectedMood === 'happy') {
+        message = "오늘 기분 최고예요! 뭐든 할 준비 완료! 😄";
+        emoji = "✨";
+    } else if (selectedMood === 'soso') {
+        message = "괜찮아요! 오늘도 잘 해낼 거예요! 💪";
+        emoji = "🍀";
+    } else if (selectedMood === 'sad') {
+        message = "조금 지쳤지만 버틸 수 있어요.. 🐌";
+        emoji = "☕";
+    }
+    
+    setToast({ visible: true, message, emoji });
+    setTimeout(() => setToast({ ...toast, visible: false }), 3000); // 3초 뒤 사라짐
+
     try {
         const newPoints = (currentUser.points || 0) + 10;
         const todayStr = new Date().toISOString().split('T')[0];
         await supabase.from('profiles').update({ points: newPoints, last_attendance: todayStr }).eq('id', currentUser.id);
         await supabase.from('point_history').insert({ user_id: currentUser.id, reason: '출석체크', amount: 10, type: 'earn' });
         fetchUserData(currentUser.id);
-        // alert('출석체크 완료! (+10P)'); // alert 대신 커스텀 모달 사용 권장
     } catch (err) { console.error(err); }
   };
 
-  // 로그아웃
   const handleLogout = async () => {
     if (!supabase) return; 
     try {
@@ -1353,24 +1417,68 @@ export default function App() {
         setSession(null);
         setMood(null);
         setPointHistory([]);
-        // alert('로그아웃 되었습니다.'); // alert 대신 커스텀 모달 사용 권장
     } catch (err) { console.error('로그아웃 실패: ', err.message); }
   };
 
-  // 비밀번호 초기화 (하드코딩된 임시 비밀번호로 변경)
   const handleChangePasswordClick = async () => {
     if (!currentUser || !supabase) return; 
     if (!window.confirm('비밀번호를 초기화(15661566) 하시겠습니까?')) return;
     try {
         const { error } = await supabase.auth.updateUser({ password: '15661566' });
         if (error) throw error;
-        // alert('비밀번호가 15661566으로 변경되었습니다.'); // alert 대신 커스텀 모달 사용 권장
     } catch (err) { console.error('변경 실패: ', err.message); }
+  };
+
+  // 1. 소속 변경 처리
+  const handleChangeDept = async (newDept, newTeam) => {
+      if (!currentUser || !supabase) return;
+      try {
+          await supabase.from('profiles').update({ dept: newDept, team: newTeam }).eq('id', currentUser.id);
+          fetchUserData(currentUser.id);
+          setShowChangeDeptModal(false);
+          alert('소속이 변경되었습니다.');
+      } catch(err) { console.error(err); }
+  };
+
+  // 1. 비밀번호 변경 처리
+  const handleChangePassword = async (newPassword) => {
+      if (!currentUser || !supabase) return;
+      try {
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          if (error) throw error;
+          setShowChangePwdModal(false);
+          alert('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
+          handleLogout();
+      } catch(err) { console.error(err); }
+  };
+
+  // 2. 관리자 포인트 지급 처리
+  const handleAdminGrantPoints = async (targetUserId, amount) => {
+      if (!currentUser || !supabase) return;
+      if (currentUser.role !== 'admin') return;
+
+      try {
+          // 대상 유저 정보 가져오기 (현재 포인트 확인용)
+          const { data: targetUser } = await supabase.from('profiles').select('points').eq('id', targetUserId).single();
+          if (!targetUser) return;
+
+          const newPoints = (targetUser.points || 0) + parseInt(amount);
+          await supabase.from('profiles').update({ points: newPoints }).eq('id', targetUserId);
+          await supabase.from('point_history').insert({ 
+              user_id: targetUserId, 
+              reason: '관리자 특별 지급', 
+              amount: parseInt(amount), 
+              type: 'earn' 
+          });
+          
+          setShowAdminGrantModal(false);
+          alert('포인트 지급이 완료되었습니다.');
+          fetchProfiles(); // 전체 프로필 갱신 (랭킹 등 반영)
+      } catch(err) { console.error(err); }
   };
 
   if (!supabase && !window.supabase) return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-500 gap-2"><Loader2 className="animate-spin" /> 앱 로딩 중...</div>;
 
-  // HomeTab에서 게시글 클릭 시 호출되어 탭과 필터를 변경 (섹션 헤더 클릭 시 사용)
   const handleNavigateToFeedWithFilter = (type) => {
     setActiveTab('feed');
     setActiveFeedFilter(type);
@@ -1378,21 +1486,26 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
-      {/* 테마 수정: 전체 배경색을 밝은 파스텔톤으로 */}
       <div className="w-full max-w-md h-full min-h-screen shadow-2xl relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100">
         <div className="relative z-10 h-full flex flex-col">
           {!session ? (
             <AuthForm isSignupMode={isSignupMode} setIsSignupMode={setIsSignupMode} handleLogin={handleLogin} handleSignup={handleSignup} loading={loading} />
           ) : (
             <>
-              <Header currentUser={currentUser} onOpenUserInfo={() => setShowUserInfoModal(true)} handleLogout={handleLogout} handleChangePasswordClick={handleChangePasswordClick} />
+              <Header 
+                currentUser={currentUser} 
+                onOpenUserInfo={() => setShowUserInfoModal(true)} 
+                handleLogout={handleLogout} 
+                onOpenChangeDept={() => setShowChangeDeptModal(true)}
+                onOpenChangePwd={() => setShowChangePwdModal(true)}
+                onOpenAdminGrant={() => setShowAdminGrantModal(true)}
+              />
               <main className="flex-1 overflow-y-auto scrollbar-hide">
-                {/* HomeTab을 다시 구성하여 게시글 목록을 포함합니다. */}
                 {activeTab === 'home' && <HomeTab 
                   mood={mood} 
                   handleMoodCheck={handleMoodCheck} 
-                  feeds={feeds} // feeds prop 추가
-                  weeklyBirthdays={weeklyBirthdays} // weeklyBirthdays prop 추가
+                  feeds={feeds} 
+                  weeklyBirthdays={weeklyBirthdays} 
                   onWriteClick={() => setShowWriteModal(true)} 
                   onNavigateToNews={() => setActiveTab('news')} 
                   onNavigateToFeed={handleNavigateToFeedWithFilter}
@@ -1413,9 +1526,19 @@ export default function App() {
                 {activeTab === 'news' && <NoticeBoard feeds={feeds} onWriteClick={() => setShowWriteModal(true)} currentUser={currentUser} />}
               </main>
               <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+              
+              {/* Modals */}
               {showWriteModal && <WriteModal setShowWriteModal={setShowWriteModal} handlePostSubmit={handlePostSubmit} currentUser={currentUser} activeTab={activeTab} />}
               {showUserInfoModal && currentUser && <UserInfoModal currentUser={currentUser} pointHistory={pointHistory} setShowUserInfoModal={setShowUserInfoModal} handleRedeemPoints={handleRedeemPoints} />}
               {showBirthdayPopup && currentUser && <BirthdayPopup currentUser={currentUser} handleBirthdayGrant={handleBirthdayGrant} setShowBirthdayPopup={setShowBirthdayPopup} />}
+              
+              {/* New Modals */}
+              {showChangeDeptModal && <ChangeDeptModal onClose={() => setShowChangeDeptModal(false)} onSave={handleChangeDept} />}
+              {showChangePwdModal && <ChangePasswordModal onClose={() => setShowChangePwdModal(false)} onSave={handleChangePassword} />}
+              {showAdminGrantModal && <AdminGrantModal onClose={() => setShowAdminGrantModal(false)} onGrant={handleAdminGrantPoints} profiles={profiles} />}
+              
+              {/* Toast */}
+              <MoodToast visible={toast.visible} message={toast.message} emoji={toast.emoji} />
             </>
           )}
         </div>
