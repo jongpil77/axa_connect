@@ -3,11 +3,9 @@ import { User, Heart, MessageCircle, Gift, Bell, Sparkles, Smile, Frown, Meh, Me
 import { createClient } from '@supabase/supabase-js';
 
 // --- [필수] Supabase 설정 ---
-// 중요: 컴포넌트 외부에서 클라이언트를 생성하여 앱 로딩 즉시 사용 가능하게 함
 const SUPABASE_URL = 'https://clsvsqiikgnreqqvcrxj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsc3ZzcWlpa2ducmVxcXZjcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNzcyNjAsImV4cCI6MjA4MDk1MzI2MH0.lsaycyp6tXjLwb-qB5PIQ0OqKweTWO3WaxZG5GYOUqk';
 
-// Supabase 클라이언트 전역 초기화 (이 객체를 앱 전체에서 사용)
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- 상수 데이터 ---
@@ -37,7 +35,6 @@ const REGIONS = {
 
 const INITIAL_POINTS = 3000; 
 const AXA_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/9/94/AXA_Logo.svg"; 
-const ADMIN_EMAIL = "jongpil.kim@axa.co.kr"; 
 
 // --- Helper Functions ---
 const formatName = (name) => {
@@ -109,6 +106,152 @@ const isToday = (timestamp) => {
 
 // --- Sub Components ---
 
+// [누락된 컴포넌트 추가 1] HomeTab
+const HomeTab = ({ mood, handleMoodCheck, feeds, weeklyBirthdays, onWriteClick, onNavigateToNews, onNavigateToFeed }) => {
+    return (
+        <div className="p-5 space-y-6 pb-28 animate-fade-in bg-blue-50">
+            {/* 기분 체크 섹션 */}
+            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-blue-100">
+                <h2 className="text-lg font-black text-slate-800 mb-4">오늘의 기분은 어때요?</h2>
+                <div className="flex justify-between gap-2">
+                    {[
+                        { id: 'happy', icon: '😄', label: '최고예요', color: 'bg-yellow-100 text-yellow-600' },
+                        { id: 'soso', icon: '🙂', label: '괜찮아요', color: 'bg-green-100 text-green-600' },
+                        { id: 'sad', icon: '😥', label: '지쳤어요', color: 'bg-slate-100 text-slate-600' }
+                    ].map((item) => (
+                        <button
+                            key={item.id}
+                            onClick={() => handleMoodCheck(item.id)}
+                            disabled={!!mood}
+                            className={`flex-1 flex flex-col items-center p-3 rounded-2xl transition-all ${
+                                mood === item.id ? 'ring-2 ring-blue-500 scale-105 bg-white shadow-md' : 'hover:bg-slate-50'
+                            } ${mood && mood !== item.id ? 'opacity-50' : ''}`}
+                        >
+                            <span className="text-3xl mb-2">{item.icon}</span>
+                            <span className="text-xs font-bold text-slate-600">{item.label}</span>
+                        </button>
+                    ))}
+                </div>
+                {mood && <div className="mt-4 text-center text-xs text-blue-500 font-bold bg-blue-50 p-2 rounded-xl">출석체크 완료! +10P 적립됨 ✨</div>}
+            </div>
+
+            {/* 바로가기 메뉴 */}
+            <div className="grid grid-cols-2 gap-3">
+                <button onClick={onNavigateToNews} className="bg-white p-4 rounded-2xl shadow-sm border border-blue-100 flex flex-col items-center gap-2 hover:bg-slate-50 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500"><Megaphone className="w-5 h-5"/></div>
+                    <span className="text-sm font-bold text-slate-700">공지사항</span>
+                </button>
+                <button onClick={() => onNavigateToFeed('knowhow')} className="bg-white p-4 rounded-2xl shadow-sm border border-blue-100 flex flex-col items-center gap-2 hover:bg-slate-50 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500"><Sparkles className="w-5 h-5"/></div>
+                    <span className="text-sm font-bold text-slate-700">업무 꿀팁</span>
+                </button>
+            </div>
+
+             {/* 생일자 알림 */}
+            {(weeklyBirthdays.current.length > 0 || weeklyBirthdays.next.length > 0) && (
+                <div className="bg-gradient-to-br from-pink-50 to-white p-5 rounded-[2rem] shadow-sm border border-pink-100">
+                    <h3 className="text-sm font-bold text-pink-600 flex items-center gap-2 mb-3">
+                        <Gift className="w-4 h-4"/> 생일 축하해주세요!
+                    </h3>
+                    <div className="space-y-3">
+                        {weeklyBirthdays.current.length > 0 && (
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 mb-1">이번 주</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {weeklyBirthdays.current.map((b, i) => (
+                                        <span key={i} className="px-3 py-1 bg-white rounded-full text-xs font-bold text-slate-700 shadow-sm border border-pink-100">
+                                            🎉 {b.name} ({b.date})
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                         {weeklyBirthdays.next.length > 0 && (
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 mb-1">다음 주</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {weeklyBirthdays.next.map((b, i) => (
+                                        <span key={i} className="px-3 py-1 bg-white/50 rounded-full text-xs text-slate-500 border border-slate-100">
+                                            {b.name} ({b.date})
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// [누락된 컴포넌트 추가 2] NoticeBoard (FeedTab을 재활용하거나 별도 구현)
+const NoticeBoard = ({ feeds, onWriteClick, currentUser }) => {
+    // 뉴스(공지사항) 타입만 필터링
+    const newsFeeds = feeds.filter(f => f.type === 'news');
+
+    return (
+        <div className="p-5 space-y-4 pb-28 animate-fade-in bg-blue-50">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-100 flex justify-between items-center">
+                <h2 className="text-lg font-black text-slate-800 flex items-center gap-2"><Bell className="w-5 h-5 text-red-500"/> 공지사항</h2>
+                 {currentUser?.role === 'admin' && (
+                    <button onClick={onWriteClick} className="text-xs bg-slate-800 text-white px-3 py-1.5 rounded-lg font-bold">글쓰기</button>
+                )}
+            </div>
+            
+            {newsFeeds.length > 0 ? (
+                <div className="space-y-3">
+                    {newsFeeds.map(feed => (
+                         <div key={feed.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                            <div className="flex justify-between items-start mb-2">
+                                <h3 className="text-sm font-bold text-slate-800">{feed.title}</h3>
+                                <span className="text-[10px] text-slate-400">{feed.formattedTime}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{feed.content}</p>
+                             {feed.image_url && (
+                                <div className="mt-3 rounded-xl overflow-hidden"><img src={feed.image_url} alt="Notice" className="w-full h-auto" /></div>
+                            )}
+                         </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center text-slate-400 py-10 text-sm">등록된 공지사항이 없습니다.</div>
+            )}
+        </div>
+    );
+};
+
+// [누락된 컴포넌트 추가 3] BirthdayPopup
+const BirthdayPopup = ({ currentUser, handleBirthdayGrant, setShowBirthdayPopup }) => {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+             <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl relative text-center overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-pink-400 to-red-400"></div>
+                <div className="mb-4 flex justify-center">
+                    <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center text-4xl shadow-inner">🎂</div>
+                </div>
+                <h3 className="text-xl font-black text-slate-800 mb-2">생일 축하합니다!</h3>
+                <p className="text-sm text-slate-600 mb-6">
+                    {currentUser.name}님,<br/>
+                    오늘 하루 가장 행복한 사람이 되세요! 🎉
+                </p>
+                <div className="bg-pink-50 p-3 rounded-xl mb-6">
+                    <p className="text-xs font-bold text-pink-600">🎁 생일 축하 선물</p>
+                    <p className="text-lg font-black text-pink-500">+1,000 P</p>
+                </div>
+                <button 
+                    onClick={handleBirthdayGrant} 
+                    className="w-full bg-gradient-to-r from-pink-500 to-red-500 text-white p-3 rounded-xl font-bold hover:shadow-lg transition-all active:scale-95"
+                >
+                    선물 받기
+                </button>
+                 <button onClick={() => setShowBirthdayPopup(false)} className="mt-3 text-xs text-slate-400 hover:text-slate-600">닫기</button>
+             </div>
+        </div>
+    );
+};
+
+
 const MoodToast = ({ message, emoji, visible }) => {
     if (!visible) return null;
     return (
@@ -177,14 +320,14 @@ const AuthForm = ({ isSignupMode, setIsSignupMode, handleLogin, handleSignup, lo
                 <div className="flex gap-2">
                     <input name="birthdate" type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className="flex-1 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm text-slate-600 focus:border-blue-500 transition-colors" required />
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 shrink-0">
-                         <label className="flex items-center gap-1 cursor-pointer">
+                          <label className="flex items-center gap-1 cursor-pointer">
                              <input type="radio" name="calendarType" value="solar" checked={calendarType === 'solar'} onChange={() => setCalendarType('solar')} className="w-3 h-3 text-blue-600" />
                              <span className="text-xs text-slate-600">양력</span>
-                         </label>
-                         <label className="flex items-center gap-1 cursor-pointer">
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer">
                              <input type="radio" name="calendarType" value="lunar" checked={calendarType === 'lunar'} onChange={() => setCalendarType('lunar')} className="w-3 h-3 text-blue-600" />
                              <span className="text-xs text-slate-600">음력</span>
-                         </label>
+                          </label>
                     </div>
                 </div>
             </div>
@@ -558,7 +701,6 @@ const FeedTab = ({ feeds, activeFeedFilter, setActiveFeedFilter, onWriteClick, c
                 
                 {feed.type === 'praise' && feed.target_name && <p className="text-xs font-bold text-green-600 mb-1">To. {feed.target_name}</p>}
                 
-                {/* 칭찬 게시글 제목 처리: 제목이 있으면 출력하고, 없으면 아예 렌더링하지 않음 */}
                 {feed.title && (
                     <h3 className="text-base font-bold text-slate-800 mb-1.5">
                         {feed.title}
@@ -626,13 +768,12 @@ const WriteModal = ({ setShowWriteModal, handlePostSubmit, currentUser, activeTa
     if (file) setImagePreview(URL.createObjectURL(file));
   };
   
-  // useMemo를 사용하여 categories 배열을 메모이제이션
   const categories = useMemo(() => [
     {id: 'praise', label: '칭찬하기', show: activeTab !== 'news'},
     {id: 'matjib', label: '맛집소개', show: activeTab !== 'news'},
     {id: 'knowhow', label: '업무꿀팁', show: activeTab !== 'news'},
     {id: 'news', label: '공지사항', show: activeTab === 'news' && currentUser?.role === 'admin'}
-  ].filter(c => c.show), [activeTab, currentUser]); // 의존성 배열에 activeTab과 currentUser 추가
+  ].filter(c => c.show), [activeTab, currentUser]);
 
   useEffect(() => {
       if (categories.length > 0 && !writeCategory) {
@@ -739,12 +880,11 @@ const RankingTab = ({ feeds, profiles, allPointHistory }) => {
     const handleNextMonth = () => {
         const nextMonth = new Date(selectedDate);
         nextMonth.setMonth(selectedDate.getMonth() + 1);
-        if (nextMonth <= new Date()) { // 미래로 이동 방지
+        if (nextMonth <= new Date()) { 
             setSelectedDate(nextMonth);
         }
     };
 
-    // 2. 월간 획득 포인트 랭킹 계산 (point_history 기반)
     const pointRanking = useMemo(() => {
         const monthlyPoints = {};
         allPointHistory.forEach(record => {
@@ -762,7 +902,6 @@ const RankingTab = ({ feeds, profiles, allPointHistory }) => {
             .slice(0, 3);
     }, [allPointHistory, profiles, selectedDate]);
 
-    // 3. 소통왕, 인기왕은 feeds 기준으로 날짜 필터링
     const postCounts = {};
     feeds.filter(f => isSelectedMonth(f.created_at)).forEach(f => {
         postCounts[f.author_id] = (postCounts[f.author_id] || 0) + 1;
@@ -804,7 +943,6 @@ const RankingTab = ({ feeds, profiles, allPointHistory }) => {
     return (
         <div className="p-5 space-y-8 pb-28 animate-fade-in bg-blue-50">
             <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-blue-100 text-center relative">
-                {/* 1. 날짜 네비게이션 */}
                 <div className="flex justify-between items-center mb-4 px-2">
                     <button onClick={handlePrevMonth} className="p-1 hover:bg-slate-100 rounded-full"><ChevronLeft className="w-5 h-5 text-slate-400" /></button>
                     <h2 className="text-lg font-black text-slate-800">{selectedDate.getFullYear()}년 {selectedDate.getMonth() + 1}월 랭킹</h2>
@@ -829,7 +967,6 @@ const RankingTab = ({ feeds, profiles, allPointHistory }) => {
     );
 };
 
-// ... BottomNav code is same ...
 const BottomNav = ({ activeTab, setActiveTab }) => (
   <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[90%] max-w-[380px] bg-[#00008F] backdrop-blur-md border border-blue-900 shadow-[0_8px_30px_rgb(0,0,0,0.3)] p-2 z-30 flex justify-between items-center rounded-3xl">
     {[{ id: 'home', icon: User, label: '홈' }, { id: 'feed', icon: MessageCircle, label: '소통' }, { id: 'news', icon: Bell, label: '소식' }, { id: 'ranking', icon: Award, label: '랭킹' }].map(item => (
@@ -848,7 +985,6 @@ export default function App() {
   const [profiles, setProfiles] = useState([]);
   const [feeds, setFeeds] = useState([]);
   const [pointHistory, setPointHistory] = useState([]);
-  // 1. 전체 포인트 히스토리 상태 추가 (랭킹용)
   const [allPointHistory, setAllPointHistory] = useState([]);
   const [redemptionList, setRedemptionList] = useState([]); 
   const [loading, setLoading] = useState(false);
@@ -856,7 +992,7 @@ export default function App() {
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [showUserInfoModal, setShowUserInfoModal] = useState(false);
   const [showBirthdayPopup, setShowBirthdayPopup] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true); // 초기 로딩 상태 추가
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const [showChangeDeptModal, setShowChangeDeptModal] = useState(false);
   const [showChangePwdModal, setShowChangePwdModal] = useState(false);
@@ -919,7 +1055,6 @@ export default function App() {
     } catch (err) { console.error(err); }
   }, [checkBirthday]);
 
-  // 개인용 포인트 히스토리
   const fetchPointHistory = useCallback(async (userId) => {
     if (!supabase) return; 
     try {
@@ -928,20 +1063,20 @@ export default function App() {
     } catch (err) { console.error(err); }
   }, []);
 
-  // 1. 전체 포인트 히스토리 가져오기 (랭킹용)
   const fetchAllPointHistory = useCallback(async () => {
       if (!supabase) return;
       try {
-          // 필요한 컬럼만 가져와서 최적화
           const { data } = await supabase.from('point_history').select('user_id, amount, type, created_at');
           if (data) setAllPointHistory(data);
       } catch(err) { console.error(err); }
   }, []);
 
+  // [중요] useCallback으로 감싸서 무한 루프 방지 (의존성 배열 관리 필수)
   const fetchFeeds = useCallback(async () => {
     if (!supabase) return; 
     try {
         const { data: posts } = await supabase.from('posts').select(`*, profiles:author_id (name, dept, team, role)`).order('created_at', { ascending: false });
+        // 주의: 모든 댓글을 한 번에 가져오는 것은 데이터가 많아지면 성능 저하의 원인이 됩니다. 추후 페이지네이션 고려 필요.
         const { data: comments } = await supabase.from('comments').select(`*, profiles:author_id (name, role)`).order('created_at', { ascending: true });
 
         if (posts) {
@@ -962,6 +1097,8 @@ export default function App() {
                     hour: '2-digit', minute: '2-digit', hour12: false,
                 }).replace(' ', ''); 
 
+                // currentUser 참조를 제거하여 의존성 끊기 (setFeeds 안에서 처리하거나, useEffect에서 갱신)
+                // 여기서는 currentUser에 따른 isLiked 처리를 나중에 하거나, 전체 리스트 렌더링 시 처리
                 return {
                     ...post,
                     author: post.profiles?.name || '알 수 없음',
@@ -969,18 +1106,22 @@ export default function App() {
                     time: new Date(post.created_at).toLocaleDateString(), 
                     formattedTime: formattedTime, 
                     likes: post.likes ? (typeof post.likes === 'string' ? JSON.parse(post.likes) : post.likes) : [], 
-                    isLiked: false,
+                    isLiked: false, // 초기값 false, 아래에서 업데이트
                     comments: buildCommentTree(postComments), 
                     totalComments: postComments.length 
                 };
             });
-            if (currentUser) {
-                formatted.forEach(p => { p.isLiked = p.likes.includes(currentUser.id); });
-            }
-            setFeeds(formatted);
+            
+            setFeeds(currentFeeds => {
+                 // currentUser가 있을 때만 isLiked 업데이트
+                if (currentUser) {
+                    return formatted.map(p => ({ ...p, isLiked: p.likes.includes(currentUser.id) }));
+                }
+                return formatted;
+            });
         }
     } catch (err) { console.error(err); }
-  }, [currentUser]);
+  }, [currentUser]); // currentUser가 변경될 때만 함수 재생성
 
   const fetchProfiles = useCallback(async () => {
     if (!supabase) return; 
@@ -1001,46 +1142,48 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return; 
 
-    // 테이블 변경 시 fetchFeeds를 통해 데이터 갱신
+    // [중요] 실시간 리스너 설정
     const channel = supabase.channel('public:comments_posts')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => { fetchFeeds(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => { fetchFeeds(); })
         .subscribe();
 
-    try {
-        // 초기 세션 확인
-        supabase.auth.getSession().then(({ data: { session } }) => {
+    const initAuth = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
             setSession(session);
             if (session) {
-                fetchUserData(session.user.id);
-                fetchPointHistory(session.user.id);
+                await fetchUserData(session.user.id);
+                await fetchPointHistory(session.user.id);
             }
+        } catch(err) {
+            console.error("Supabase auth error:", err);
+        } finally {
             setIsAuthLoading(false); // 로딩 완료
-        });
+        }
+    };
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            if (session) {
-                fetchUserData(session.user.id);
-                fetchPointHistory(session.user.id);
-            } else {
-                setCurrentUser(null);
-            }
-            setIsAuthLoading(false); // 상태 변경 시에도 로딩 완료 처리
-        });
+    initAuth();
 
-        fetchFeeds();
-        fetchProfiles();
-        fetchAllPointHistory(); 
-        
-        return () => {
-            subscription.unsubscribe();
-            supabase.removeChannel(channel);
-        };
-    } catch(err) { 
-        console.error("Supabase init error:", err);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setSession(session);
+        if (session) {
+             await fetchUserData(session.user.id);
+             await fetchPointHistory(session.user.id);
+        } else {
+            setCurrentUser(null);
+        }
         setIsAuthLoading(false);
-    }
+    });
+
+    fetchFeeds();
+    fetchProfiles();
+    fetchAllPointHistory(); 
+    
+    return () => {
+        subscription.unsubscribe();
+        supabase.removeChannel(channel);
+    };
   }, [fetchFeeds, fetchPointHistory, fetchProfiles, fetchUserData, fetchAllPointHistory]);
 
   const checkSupabaseConfig = () => {
@@ -1058,7 +1201,7 @@ export default function App() {
         setShowBirthdayPopup(false);
         fetchUserData(currentUser.id);
         fetchPointHistory(currentUser.id);
-        fetchAllPointHistory(); // 랭킹 갱신
+        fetchAllPointHistory(); 
     } catch (err) { console.error('오류 발생: ', err.message); }
   };
 
@@ -1070,13 +1213,13 @@ export default function App() {
       if (isLiked) { newLikes = newLikes.filter(id => id !== userId); } 
       else { newLikes.push(userId); }
       
-      setFeeds(feeds.map(f => f.id === postId ? { ...f, likes: newLikes, isLiked: !isLiked } : f));
+      // Optimistic UI Update (즉각 반응)
+      setFeeds(prevFeeds => prevFeeds.map(f => f.id === postId ? { ...f, likes: newLikes, isLiked: !isLiked } : f));
       
       try { await supabase.from('posts').update({ likes: newLikes }).eq('id', postId); } 
-      catch (err) { console.error(err); fetchFeeds(); }
+      catch (err) { console.error(err); fetchFeeds(); } // 실패시 롤백을 위해 다시 fetch
   };
 
-  // 댓글 추가 함수 수정: setTimeout 제거
   const handleAddComment = async (e, postId, parentId = null) => {
       e.preventDefault();
       const content = e.target.commentContent.value;
@@ -1087,16 +1230,13 @@ export default function App() {
               post_id: postId, author_id: currentUser.id, content: content, parent_id: parentId 
           });
           e.target.reset();
-          // fetchFeeds(); // 실시간 리스너가 처리
       } catch (err) { console.error('댓글 작성 실패: ', err.message); }
   };
   
-  // 댓글 삭제 함수 수정: setTimeout 제거
   const handleDeleteComment = async (commentId) => {
       if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
       try {
           await supabase.from('comments').delete().eq('id', commentId);
-          // fetchFeeds(); // 실시간 리스너가 처리
       } catch (err) { console.error('삭제 실패: ', err.message); }
   };
 
@@ -1126,7 +1266,7 @@ export default function App() {
 
             await supabase.from('point_history').insert({ user_id: currentUser.id, reason: reasonText, amount: 100, type: 'use' });
             fetchUserData(currentUser.id); 
-            fetchAllPointHistory(); // 랭킹 갱신
+            fetchAllPointHistory(); 
         }
         fetchFeeds();
     } catch (err) { console.error('삭제 실패: ', err.message); }
@@ -1243,7 +1383,7 @@ export default function App() {
         setShowWriteModal(false);
         fetchFeeds();
         fetchUserData(currentUser.id);
-        fetchAllPointHistory(); // 랭킹 갱신
+        fetchAllPointHistory(); 
     } catch (err) { console.error('작성 실패: ', err.message); }
   };
 
@@ -1273,7 +1413,7 @@ export default function App() {
         await supabase.from('profiles').update({ points: newPoints, last_attendance: todayStr }).eq('id', currentUser.id);
         await supabase.from('point_history').insert({ user_id: currentUser.id, reason: '출석체크', amount: 10, type: 'earn' });
         fetchUserData(currentUser.id);
-        fetchAllPointHistory(); // 랭킹 갱신
+        fetchAllPointHistory(); 
     } catch (err) { console.error(err); }
   };
 
@@ -1338,7 +1478,7 @@ export default function App() {
           setShowAdminGrantModal(false);
           alert('포인트 지급이 완료되었습니다.');
           fetchProfiles(); 
-          fetchAllPointHistory(); // 랭킹 갱신
+          fetchAllPointHistory(); 
       } catch(err) { console.error(err); }
   };
 
@@ -1394,7 +1534,7 @@ export default function App() {
                     handleAddComment={handleAddComment} 
                     handleDeleteComment={handleDeleteComment} 
                 />}
-                {/* 랭킹 탭에 전체 포인트 이력을 전달 */}
+                
                 {activeTab === 'ranking' && <RankingTab feeds={feeds} profiles={profiles} allPointHistory={allPointHistory} />}
                 {activeTab === 'news' && <NoticeBoard feeds={feeds} onWriteClick={() => setShowWriteModal(true)} currentUser={currentUser} />}
               </main>
