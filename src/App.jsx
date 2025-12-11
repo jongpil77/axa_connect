@@ -106,7 +106,7 @@ const isToday = (timestamp) => {
 
 // --- Sub Components ---
 
-const HomeTab = ({ mood, handleMoodCheck, feeds, weeklyBirthdays, onWriteClick, onNavigateToNews, onNavigateToFeed }) => {
+const HomeTab = ({ mood, handleMoodCheck, feeds = [], weeklyBirthdays = {current:[], next:[]}, onWriteClick, onNavigateToNews, onNavigateToFeed }) => {
     return (
         <div className="p-5 space-y-6 pb-28 animate-fade-in bg-blue-50">
             {/* 기분 체크 섹션 */}
@@ -184,7 +184,7 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, weeklyBirthdays, onWriteClick, 
     );
 };
 
-const NoticeBoard = ({ feeds, onWriteClick, currentUser }) => {
+const NoticeBoard = ({ feeds = [], onWriteClick, currentUser }) => {
     const newsFeeds = feeds.filter(f => f.type === 'news');
 
     return (
@@ -219,7 +219,6 @@ const NoticeBoard = ({ feeds, onWriteClick, currentUser }) => {
 };
 
 const BirthdayPopup = ({ currentUser, handleBirthdayGrant, setShowBirthdayPopup }) => {
-    // 안전한 이름 표시
     const userName = currentUser?.name || '회원';
 
     return (
@@ -370,10 +369,9 @@ const Header = ({ currentUser, onOpenUserInfo, handleLogout, onOpenChangeDept, o
   const todayDate = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const [showSettings, setShowSettings] = useState(false);
   
-  // 방어 코드: currentUser가 없으면 렌더링하지 않거나 기본값 처리
   if (!currentUser) return null;
 
-  const displayName = formatName(currentUser?.name);
+  const displayName = formatName(currentUser.name);
   
   return (
     <div className="bg-white/80 backdrop-blur-md p-4 sticky top-0 z-30 border-b border-slate-100 shadow-sm">
@@ -390,7 +388,7 @@ const Header = ({ currentUser, onOpenUserInfo, handleLogout, onOpenChangeDept, o
              <div className="flex flex-col items-start leading-none">
                  <span className="text-[9px] text-slate-400 font-normal mb-0.5">내 포인트</span>
                  <span className="text-sm font-black text-slate-700">
-                     {currentUser?.points?.toLocaleString() || 0} P
+                     {currentUser.points?.toLocaleString() || 0} P
                  </span>
              </div>
           </div>
@@ -410,7 +408,7 @@ const Header = ({ currentUser, onOpenUserInfo, handleLogout, onOpenChangeDept, o
                    <Key className="w-3.5 h-3.5 text-blue-400"/> 비밀번호 변경
                 </button>
                 
-                {currentUser?.role === 'admin' && (
+                {currentUser.role === 'admin' && (
                     <>
                     <button onClick={() => { setShowSettings(false); onOpenAdminGrant(); }} className="flex items-center gap-2 w-full p-3 text-xs text-blue-600 font-bold hover:bg-blue-50 border-b border-slate-50 transition-colors">
                         <Gift className="w-3.5 h-3.5 text-blue-500"/> 포인트 지급 (관리자)
@@ -631,7 +629,7 @@ const Comment = ({ comment, currentUser, handleDeleteComment }) => (
     </div>
 );
 
-const FeedTab = ({ feeds, activeFeedFilter, setActiveFeedFilter, onWriteClick, currentUser, handleDeletePost, handleLikePost, handleAddComment, handleDeleteComment }) => {
+const FeedTab = ({ feeds = [], activeFeedFilter, setActiveFeedFilter, onWriteClick, currentUser, handleDeletePost, handleLikePost, handleAddComment, handleDeleteComment }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredFeeds = feeds.filter(f => {
@@ -1131,9 +1129,14 @@ export default function App() {
       } catch (err) { console.error(err); }
   }, []);
 
-  // [수정됨] useEffect 1: 초기 인증 및 데이터 로드 (단 1회 실행)
+  // [수정됨] useEffect 1: 초기 인증 및 데이터 로드 (타임아웃 적용)
   useEffect(() => {
     let mounted = true;
+
+    // 강제 로딩 해제 타이머 (3초 뒤에는 무조건 화면을 보여줌)
+    const safetyTimer = setTimeout(() => {
+        if(mounted) setIsAuthLoading(false);
+    }, 3000);
 
     const initAuth = async () => {
         try {
@@ -1176,9 +1179,10 @@ export default function App() {
 
     return () => {
         mounted = false;
+        clearTimeout(safetyTimer); // 타이머 정리
         subscription.unsubscribe();
     };
-  }, []); // 빈 배열: 마운트 시 1회만 실행
+  }, []); 
 
   // [수정됨] useEffect 2: 실시간 구독 (별도 분리)
   useEffect(() => {
@@ -1201,7 +1205,7 @@ export default function App() {
               isLiked: f.likes.includes(currentUser.id)
           })));
       }
-  }, [currentUser?.id]); // currentUser.id가 바뀔 때만 실행
+  }, [currentUser?.id]); 
 
   const checkSupabaseConfig = () => {
     if (!supabase) return false;
@@ -1505,8 +1509,9 @@ export default function App() {
 
   if (isAuthLoading) {
       return (
-          <div className="min-h-screen bg-blue-50 flex justify-center items-center">
+          <div className="min-h-screen bg-blue-50 flex justify-center items-center flex-col gap-4">
               <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+              <p className="text-xs text-slate-400">앱을 로딩중입니다...</p>
           </div>
       );
   }
@@ -1520,73 +1525,81 @@ export default function App() {
           ) : (
             <>
               {/* currentUser가 로드되기 전에는 Header를 표시하지 않거나, currentUser가 null이어도 안전하게 처리 */}
-              {currentUser && (
-                  <Header 
-                    currentUser={currentUser} 
-                    onOpenUserInfo={() => setShowUserInfoModal(true)} 
-                    handleLogout={handleLogout} 
-                    onOpenChangeDept={() => setShowChangeDeptModal(true)}
-                    onOpenChangePwd={() => setShowChangePwdModal(true)}
-                    onOpenAdminGrant={() => setShowAdminGrantModal(true)}
-                    onOpenRedemptionList={() => { fetchRedemptionList(); setShowRedemptionListModal(true); }}
-                  />
+              {/* [수정 포인트] currentUser가 아직 로딩중이면 로더를 표시하여 하얀 화면 방지 */}
+              {!currentUser ? (
+                  <div className="flex-1 flex flex-col items-center justify-center h-full">
+                      <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-2" />
+                      <p className="text-xs text-slate-400">사용자 정보를 불러오는 중...</p>
+                  </div>
+              ) : (
+                  <>
+                      <Header 
+                        currentUser={currentUser} 
+                        onOpenUserInfo={() => setShowUserInfoModal(true)} 
+                        handleLogout={handleLogout} 
+                        onOpenChangeDept={() => setShowChangeDeptModal(true)}
+                        onOpenChangePwd={() => setShowChangePwdModal(true)}
+                        onOpenAdminGrant={() => setShowAdminGrantModal(true)}
+                        onOpenRedemptionList={() => { fetchRedemptionList(); setShowRedemptionListModal(true); }}
+                      />
+                      
+                      <main className="flex-1 overflow-y-auto scrollbar-hide">
+                        {activeTab === 'home' && (
+                            <HomeTab 
+                                mood={mood} 
+                                handleMoodCheck={handleMoodCheck} 
+                                feeds={feeds} 
+                                weeklyBirthdays={weeklyBirthdays} 
+                                onWriteClick={() => setShowWriteModal(true)} 
+                                onNavigateToNews={() => setActiveTab('news')} 
+                                onNavigateToFeed={handleNavigateToFeedWithFilter}
+                            />
+                        )}
+                        
+                        {activeTab === 'feed' && (
+                            <FeedTab 
+                                feeds={feeds} 
+                                activeFeedFilter={activeFeedFilter} 
+                                setActiveFeedFilter={setActiveFeedFilter} 
+                                onWriteClick={() => setShowWriteModal(true)} 
+                                currentUser={currentUser} 
+                                handleDeletePost={handleDeletePost} 
+                                handleLikePost={handleLikePost} 
+                                handleAddComment={handleAddComment} 
+                                handleDeleteComment={handleDeleteComment} 
+                            />
+                        )}
+                        
+                        {activeTab === 'ranking' && <RankingTab feeds={feeds} profiles={profiles} allPointHistory={allPointHistory} />}
+                        
+                        {activeTab === 'news' && (
+                            <NoticeBoard 
+                                feeds={feeds} 
+                                onWriteClick={() => setShowWriteModal(true)} 
+                                currentUser={currentUser} 
+                            />
+                        )}
+                      </main>
+                      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+                      
+                      {/* Modals - 방어 코드 추가: currentUser 존재 확인 */}
+                      {showWriteModal && currentUser && <WriteModal setShowWriteModal={setShowWriteModal} handlePostSubmit={handlePostSubmit} currentUser={currentUser} activeTab={activeTab} />}
+                      {showUserInfoModal && currentUser && <UserInfoModal currentUser={currentUser} pointHistory={pointHistory} setShowUserInfoModal={setShowUserInfoModal} handleRedeemPoints={handleRedeemPoints} />}
+                      {showBirthdayPopup && currentUser && <BirthdayPopup currentUser={currentUser} handleBirthdayGrant={handleBirthdayGrant} setShowBirthdayPopup={setShowBirthdayPopup} />}
+                      
+                      {/* Settings Modals */}
+                      {showChangeDeptModal && <ChangeDeptModal onClose={() => setShowChangeDeptModal(false)} onSave={handleChangeDept} />}
+                      {showChangePwdModal && <ChangePasswordModal onClose={() => setShowChangePwdModal(false)} onSave={handleChangePassword} />}
+                      {showAdminGrantModal && <AdminGrantModal onClose={() => setShowAdminGrantModal(false)} onGrant={handleAdminGrantPoints} profiles={profiles} />}
+                      {showRedemptionListModal && <RedemptionListModal onClose={() => setShowRedemptionListModal(false)} redemptionList={redemptionList} />}
+                      
+                      {/* Admin Alert Modal (New) */}
+                      {showAdminAlertModal && <AdminAlertModal onClose={handleCloseAdminAlert} />}
+                      
+                      {/* Toast */}
+                      <MoodToast visible={toast.visible} message={toast.message} emoji={toast.emoji} />
+                  </>
               )}
-              
-              <main className="flex-1 overflow-y-auto scrollbar-hide">
-                {activeTab === 'home' && (
-                    <HomeTab 
-                        mood={mood} 
-                        handleMoodCheck={handleMoodCheck} 
-                        feeds={feeds} 
-                        weeklyBirthdays={weeklyBirthdays} 
-                        onWriteClick={() => setShowWriteModal(true)} 
-                        onNavigateToNews={() => setActiveTab('news')} 
-                        onNavigateToFeed={handleNavigateToFeedWithFilter}
-                    />
-                )}
-                
-                {activeTab === 'feed' && (
-                    <FeedTab 
-                        feeds={feeds} 
-                        activeFeedFilter={activeFeedFilter} 
-                        setActiveFeedFilter={setActiveFeedFilter} 
-                        onWriteClick={() => setShowWriteModal(true)} 
-                        currentUser={currentUser} 
-                        handleDeletePost={handleDeletePost} 
-                        handleLikePost={handleLikePost} 
-                        handleAddComment={handleAddComment} 
-                        handleDeleteComment={handleDeleteComment} 
-                    />
-                )}
-                
-                {activeTab === 'ranking' && <RankingTab feeds={feeds} profiles={profiles} allPointHistory={allPointHistory} />}
-                
-                {activeTab === 'news' && (
-                    <NoticeBoard 
-                        feeds={feeds} 
-                        onWriteClick={() => setShowWriteModal(true)} 
-                        currentUser={currentUser} 
-                    />
-                )}
-              </main>
-              <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-              
-              {/* Modals - 방어 코드 추가: currentUser 존재 확인 */}
-              {showWriteModal && currentUser && <WriteModal setShowWriteModal={setShowWriteModal} handlePostSubmit={handlePostSubmit} currentUser={currentUser} activeTab={activeTab} />}
-              {showUserInfoModal && currentUser && <UserInfoModal currentUser={currentUser} pointHistory={pointHistory} setShowUserInfoModal={setShowUserInfoModal} handleRedeemPoints={handleRedeemPoints} />}
-              {showBirthdayPopup && currentUser && <BirthdayPopup currentUser={currentUser} handleBirthdayGrant={handleBirthdayGrant} setShowBirthdayPopup={setShowBirthdayPopup} />}
-              
-              {/* Settings Modals */}
-              {showChangeDeptModal && <ChangeDeptModal onClose={() => setShowChangeDeptModal(false)} onSave={handleChangeDept} />}
-              {showChangePwdModal && <ChangePasswordModal onClose={() => setShowChangePwdModal(false)} onSave={handleChangePassword} />}
-              {showAdminGrantModal && <AdminGrantModal onClose={() => setShowAdminGrantModal(false)} onGrant={handleAdminGrantPoints} profiles={profiles} />}
-              {showRedemptionListModal && <RedemptionListModal onClose={() => setShowRedemptionListModal(false)} redemptionList={redemptionList} />}
-              
-              {/* Admin Alert Modal (New) */}
-              {showAdminAlertModal && <AdminAlertModal onClose={handleCloseAdminAlert} />}
-              
-              {/* Toast */}
-              <MoodToast visible={toast.visible} message={toast.message} emoji={toast.emoji} />
             </>
           )}
         </div>
