@@ -1040,19 +1040,36 @@ export default function App() {
       setShowAdminAlertModal(false);
   };
 
-  // [3] 사용자 정보 가져오기
-  const fetchUserData = useCallback(async (userId) => {
+  // [3] 사용자 정보 가져오기 (Fail-Open 적용)
+  const fetchUserData = useCallback(async (userId, userEmail = '') => {
     if (!supabase) return; 
     try {
-        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        if (data) {
+        // 'maybeSingle' 사용: 데이터가 없어도 에러를 뱉지 않고 null을 반환
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+        
+        if (error) {
+            console.error("프로필 가져오기 DB 에러:", error);
+            // 에러가 나도 앱이 멈추지 않도록 가짜 유저라도 생성
+            const fallbackUser = { id: userId, name: '사용자(오류)', email: userEmail, role: 'member', points: 0, dept: '-', team: '-' };
+            setCurrentUser(fallbackUser);
+        } else if (data) {
+            // 정상 데이터
             setCurrentUser(data);
             const todayStr = new Date().toISOString().split('T')[0];
             if (data.last_attendance === todayStr) setMood('checked');
             checkBirthday(data);
             checkAdminNotifications(data); 
+        } else {
+            // 데이터가 없는 경우 (가입 직후 등)
+            console.warn("프로필 데이터 없음. Fallback 실행");
+            const fallbackUser = { id: userId, name: '알 수 없음', email: userEmail, role: 'member', points: 0, dept: '미정', team: '미정' };
+            setCurrentUser(fallbackUser);
         }
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+        console.error("fetchUserData 실행 중 치명적 오류:", err);
+        // 치명적 오류 시에도 앱 진입 허용
+        setCurrentUser({ id: userId, name: '에러 발생', role: 'member', points: 0 });
+    }
   }, [checkBirthday]);
 
   const fetchPointHistory = useCallback(async (userId) => {
@@ -1129,31 +1146,33 @@ export default function App() {
       } catch (err) { console.error(err); }
   }, []);
 
-  // [수정됨] useEffect 1: 초기 인증 및 데이터 로드 (타임아웃 적용)
+  // [수정됨] useEffect 1: 초기 인증 및 데이터 로드
   useEffect(() => {
     let mounted = true;
 
-    // 강제 로딩 해제 타이머 (3초 뒤에는 무조건 화면을 보여줌)
+    // 안전 타이머: 2초가 지나도 로딩이 안 끝나면 강제로 끝냄 (무한 로딩 방지 핵심)
     const safetyTimer = setTimeout(() => {
-        if(mounted) setIsAuthLoading(false);
-    }, 3000);
+        if(mounted && isAuthLoading) {
+            console.warn("로딩 시간 초과. 강제 로딩 해제.");
+            setIsAuthLoading(false);
+        }
+    }, 2000);
 
     const initAuth = async () => {
         try {
-            if (!supabase) throw new Error("Supabase client not initialized");
-            
             const { data: { session } } = await supabase.auth.getSession();
             if (mounted) {
                 setSession(session);
                 if (session) {
-                    await fetchUserData(session.user.id);
+                    // 이메일 정보까지 넘겨서 Fallback 데이터 생성에 활용
+                    await fetchUserData(session.user.id, session.user.email);
                     await fetchPointHistory(session.user.id);
                 }
             }
         } catch(err) {
             console.error("Auth init error:", err);
         } finally {
-            if (mounted) setIsAuthLoading(false); // 로딩 종료 보장
+            if (mounted) setIsAuthLoading(false);
         }
     };
 
@@ -1168,7 +1187,7 @@ export default function App() {
         if (mounted) {
             setSession(session);
             if (session) {
-                 await fetchUserData(session.user.id);
+                 await fetchUserData(session.user.id, session.user.email);
                  await fetchPointHistory(session.user.id);
             } else {
                 setCurrentUser(null);
@@ -1179,12 +1198,12 @@ export default function App() {
 
     return () => {
         mounted = false;
-        clearTimeout(safetyTimer); // 타이머 정리
+        clearTimeout(safetyTimer);
         subscription.unsubscribe();
     };
   }, []); 
 
-  // [수정됨] useEffect 2: 실시간 구독 (별도 분리)
+  // [수정됨] useEffect 2: 실시간 구독
   useEffect(() => {
     if (!supabase) return;
     const channel = supabase.channel('public:comments_posts')
@@ -1524,8 +1543,7 @@ export default function App() {
             <AuthForm isSignupMode={isSignupMode} setIsSignupMode={setIsSignupMode} handleLogin={handleLogin} handleSignup={handleSignup} loading={loading} />
           ) : (
             <>
-              {/* currentUser가 로드되기 전에는 Header를 표시하지 않거나, currentUser가 null이어도 안전하게 처리 */}
-              {/* [수정 포인트] currentUser가 아직 로딩중이면 로더를 표시하여 하얀 화면 방지 */}
+              {/* [안전장치] currentUser가 null이면 로더를 표시하지만, 타임아웃 이후에는 fallback 데이터로 인해 이 상태가 해제됨 */}
               {!currentUser ? (
                   <div className="flex-1 flex flex-col items-center justify-center h-full">
                       <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-2" />
