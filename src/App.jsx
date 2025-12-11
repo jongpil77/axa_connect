@@ -1,17 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Heart, MessageCircle, Gift, Bell, Sparkles, Smile, Frown, Meh, Megaphone, X, Send, Settings, ChevronRight, LogOut, Image as ImageIcon, Coins, Pencil, Trash2, Loader2, Lock, Clock, Award, Wallet, Building2, CornerDownRight, Link as LinkIcon, MapPin, Search, Key, Edit3, ClipboardList } from 'lucide-react';
+import { User, Heart, MessageCircle, Gift, Bell, Sparkles, Smile, Frown, Meh, Megaphone, X, Send, Settings, ChevronRight, LogOut, Image as ImageIcon, Coins, Pencil, Trash2, Loader2, Lock, Clock, Award, Wallet, Building2, CornerDownRight, Link as LinkIcon, MapPin, Search, Key, Edit3, ClipboardList, CheckSquare } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- [필수] Supabase 설정 ---
 const SUPABASE_URL = 'https://clsvsqiikgnreqqvcrxj.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsc3ZzcWlpa2ducmVxcXZjcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNzcyNjAsImV4cCI6MjA4MDk1MzI2MH0.lsaycyp6tXjLwb-qB5PIQ0OqKweTWO3WaxZG5GYOUqk';
 
-// --- 상수 데이터 ---
+// --- 상수 데이터 (조직도 업데이트 완료) ---
 const ORGANIZATION = {
-  '본사': ['보상기획팀', '총무팀', '재무팀'],
-  '서울보상부': ['플랫폼개발팀', 'AI연구센터', 'QA파트', '디자인팀'],
-  '경인보상부': ['국내영업팀', '해외영업팀', '브랜드마케팅팀', 'CS센터'],
-  '중부보상부': ['기획파트', '사업개발팀']
+  '본사': ['보상기획팀', '보상지원팀', 'A&H손해사정지원팀', '고객지원팀'],
+  '서울보상부': ['강북대물', '남양주대물', '강남대물', '일산대물', '서울외제차', '강원보상', '동부대인', '서부대인'],
+  '경인보상부': ['경인', '인천대물', '강서대물', '성남대물', '수원대물', '경인외제차', '경기대인', '인천대인'],
+  '중부보상부': ['중부', '대전대물', '광주대물', '전주대물', '청주대물', '대전대인', '광주대인'],
+  '남부보상부': ['남부', '대구대물', '경북대물', '부산대물', '경남대물', '제주보상', '대구대인', '부산대인'],
+  '스마트보상부': ['스마트지원', '스피드대물', '프라임대물1', '스피드대인', '프라임대인1', '프라임대인2', '프라임대인3'],
+  '특수보상부': ['특수조사센터', '구상보상1', '구상보상2', '의료', 'SIU'],
+  'A&H보상부': ['A&H보상1', 'A&H보상2'],
+  '사당CS부': ['사당CS'],
+  '대구CS부': ['대구CS']
 };
 
 const REGIONS = {
@@ -112,10 +118,43 @@ const MoodToast = ({ message, emoji, visible }) => {
     );
 };
 
+// 1. 관리자용 포인트 차감 알림 팝업 (체크박스 포함)
+const AdminAlertModal = ({ onClose }) => {
+    const [doNotShow, setDoNotShow] = useState(false);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl relative">
+                <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-red-500">
+                    <Bell className="w-5 h-5"/> 알림
+                </h3>
+                <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+                    📢 <strong>처리되지 않은 포인트 차감 신청</strong>이 있습니다.<br/>
+                    설정 메뉴에서 내역을 확인해주세요.
+                </p>
+                
+                <div className="flex items-center gap-2 mb-4 bg-slate-50 p-2 rounded-lg cursor-pointer" onClick={() => setDoNotShow(!doNotShow)}>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${doNotShow ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300'}`}>
+                        {doNotShow && <CheckSquare className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className="text-xs text-slate-500 select-none">오늘 하루 더 이상 열지 않기</span>
+                </div>
+
+                <button 
+                    onClick={() => onClose(doNotShow)} 
+                    className="w-full bg-slate-800 text-white p-3 rounded-xl font-bold hover:bg-slate-900 transition-colors"
+                >
+                    확인
+                </button>
+            </div>
+        </div>
+    );
+};
+
 const AuthForm = ({ isSignupMode, setIsSignupMode, handleLogin, handleSignup, loading }) => {
   const [birthdate, setBirthdate] = useState('');
   const [calendarType, setCalendarType] = useState('solar'); 
-  const [selectedDept, setSelectedDept] = useState(''); // Added missing state
+  const [selectedDept, setSelectedDept] = useState(''); 
 
   return (
     <div className="min-h-screen bg-blue-50 flex justify-center items-center p-6">
@@ -184,7 +223,6 @@ const AuthForm = ({ isSignupMode, setIsSignupMode, handleLogin, handleSignup, lo
   );
 };
 
-// Header: 메뉴 확장 (관리자용 포인트 신청 확인 추가)
 const Header = ({ currentUser, onOpenUserInfo, handleLogout, onOpenChangeDept, onOpenChangePwd, onOpenAdminGrant, onOpenRedemptionList }) => {
   const todayDate = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const [showSettings, setShowSettings] = useState(false);
@@ -221,7 +259,6 @@ const Header = ({ currentUser, onOpenUserInfo, handleLogout, onOpenChangeDept, o
                    <Key className="w-3.5 h-3.5 text-blue-400"/> 비밀번호 변경
                 </button>
                 
-                {/* 관리자용 메뉴 */}
                 {currentUser?.role === 'admin' && (
                     <>
                     <button onClick={() => { setShowSettings(false); onOpenAdminGrant(); }} className="flex items-center gap-2 w-full p-3 text-xs text-blue-600 font-bold hover:bg-blue-50 border-b border-slate-50 transition-colors">
@@ -331,7 +368,6 @@ const AdminGrantModal = ({ onClose, onGrant, profiles }) => {
     );
 };
 
-// 3. 관리자용 포인트 차감 신청 내역 모달
 const RedemptionListModal = ({ onClose, redemptionList }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
@@ -513,14 +549,18 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, onWriteClick, onNavigateToNews,
         onNavigateToFeed(type); 
     };
 
+    // 2. 기분 선택 버튼 스타일 (선택 시 해당 색상 유지, 나머지는 회색 처리)
     const getMoodButtonStyle = (type) => {
         if (mood === type) {
+            // 선택된 항목은 원래 색상을 유지하면서 강조 (Restore original color)
             if (type === 'happy') return 'bg-blue-500 border-blue-600 text-white shadow-md scale-105 ring-2 ring-blue-200';
             if (type === 'soso') return 'bg-yellow-400 border-yellow-500 text-white shadow-md scale-105 ring-2 ring-yellow-200';
             if (type === 'sad') return 'bg-orange-500 border-orange-600 text-white shadow-md scale-105 ring-2 ring-orange-200';
         } else if (mood) {
+            // 다른 것이 선택되었을 때는 회색으로 죽임
             return 'bg-slate-100 border-slate-200 text-slate-300';
         } else {
+            // 아무것도 선택 안 되었을 때는 기본 색상 (약간 투명하게)
             if (type === 'happy') return 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 opacity-90';
             if (type === 'soso') return 'bg-yellow-400 border-yellow-400 text-white hover:bg-yellow-500 opacity-90';
             if (type === 'sad') return 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600 opacity-90';
@@ -1046,6 +1086,7 @@ export default function App() {
   const [showChangePwdModal, setShowChangePwdModal] = useState(false);
   const [showAdminGrantModal, setShowAdminGrantModal] = useState(false);
   const [showRedemptionListModal, setShowRedemptionListModal] = useState(false); 
+  const [showAdminAlertModal, setShowAdminAlertModal] = useState(false); 
   const [toast, setToast] = useState({ visible: false, message: '', emoji: '' });
 
   const [activeTab, setActiveTab] = useState('home');
@@ -1071,12 +1112,26 @@ export default function App() {
 
   const checkAdminNotifications = async (user) => {
       if (user.role !== 'admin' || !supabase) return;
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      const hideDate = localStorage.getItem('hide_admin_alert');
+
+      if (hideDate === todayStr) return;
+
       try {
           const { count, error } = await supabase.from('redemption_requests').select('*', { count: 'exact', head: true }); 
           if (!error && count > 0) {
-              alert("📢 처리되지 않은 포인트 차감 신청이 있습니다!");
+              setShowAdminAlertModal(true); 
           }
       } catch (err) { console.error(err); }
+  };
+
+  const handleCloseAdminAlert = (doNotShowToday) => {
+      if (doNotShowToday) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          localStorage.setItem('hide_admin_alert', todayStr);
+      }
+      setShowAdminAlertModal(false);
   };
 
   const fetchUserData = useCallback(async (userId) => {
@@ -1153,7 +1208,6 @@ export default function App() {
     } catch (err) { console.error(err); }
   }, [supabase]);
 
-  // 관리자용 신청 리스트 조회
   const fetchRedemptionList = useCallback(async () => {
       if (!supabase) return;
       try {
@@ -1292,9 +1346,7 @@ export default function App() {
         await supabase.from('profiles').update({ points: newPoints }).eq('id', currentUser.id);
         await supabase.from('point_history').insert({ user_id: currentUser.id, reason: '포인트 차감 신청', amount: 10000, type: 'use' });
         
-        const subject = encodeURIComponent(`[AXA Connect] 포인트 차감 신청 - ${currentUser.name}`);
-        const body = encodeURIComponent(`사용자: ${currentUser.name} (${currentUser.email})\n신청 포인트: 10,000P\n\n처리 부탁드립니다.`);
-        window.location.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
+        // 메일 발송 기능 제거됨 (DB 저장만 수행)
         
         fetchUserData(currentUser.id);
         fetchPointHistory(currentUser.id);
@@ -1302,7 +1354,6 @@ export default function App() {
     } catch (err) { console.error('신청 실패: ', err.message); }
   };
 
-  // 1. 로그인 핸들러 수정 (에러 세분화)
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!checkSupabaseConfig()) return;
@@ -1311,23 +1362,13 @@ export default function App() {
     const password = e.target.password.value;
     
     try {
-        // 1-1. 이메일 존재 여부 확인 (프로필 테이블 조회)
-        // (보안상 권장되지 않으나 요청사항 반영을 위해 구현)
         const { data: userCheck } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
-        
-        // 주의: DB에 email 컬럼이 없거나 RLS 정책으로 조회가 막히면 정확하지 않을 수 있음
-        // 하지만 기존 코드 흐름상 profiles에 데이터가 있어야 하므로 시도
-        
-        // 1-2. 로그인 시도
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         
         if (error) {
-            // 이메일 확인 결과가 확실히 없다면 메일 계정 오류로 처리
-            // (userCheck가 null이면 계정이 없는 것)
             if (userCheck === null) {
                  alert('가입되지 않은 이메일 계정입니다.');
             } else {
-                 // 계정은 있는데 로그인이 안되면 비밀번호 오류
                  alert('비밀번호가 일치하지 않습니다.');
             }
         }
@@ -1350,7 +1391,7 @@ export default function App() {
     try {
         const initialData = { 
             name: name.value, dept: dept.value, team: team.value, role: role, points: INITIAL_POINTS, 
-            birthdate: birthdate.value, calendar_type: calendarType.value, email: email.value // 이메일 저장 추가
+            birthdate: birthdate.value, calendar_type: calendarType.value, email: email.value 
         };
         const { data: signUpResult, error } = await supabase.auth.signUp({ email: email.value, password: password.value, options: { data: initialData } });
         if (error) throw error;
@@ -1563,6 +1604,9 @@ export default function App() {
               {showChangePwdModal && <ChangePasswordModal onClose={() => setShowChangePwdModal(false)} onSave={handleChangePassword} />}
               {showAdminGrantModal && <AdminGrantModal onClose={() => setShowAdminGrantModal(false)} onGrant={handleAdminGrantPoints} profiles={profiles} />}
               {showRedemptionListModal && <RedemptionListModal onClose={() => setShowRedemptionListModal(false)} redemptionList={redemptionList} />}
+              
+              {/* Admin Alert Modal (New) */}
+              {showAdminAlertModal && <AdminAlertModal onClose={handleCloseAdminAlert} />}
               
               {/* Toast */}
               <MoodToast visible={toast.visible} message={toast.message} emoji={toast.emoji} />
