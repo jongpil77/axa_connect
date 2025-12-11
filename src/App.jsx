@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = 'https://clsvsqiikgnreqqvcrxj.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsc3ZzcWlpa2ducmVxcXZjcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNzcyNjAsImV4cCI6MjA4MDk1MzI2MH0.lsaycyp6tXjLwb-qB5PIQ0OqKweTWO3WaxZG5GYOUqk';
 
-// --- 상수 데이터 (조직도 업데이트 완료) ---
+// --- 상수 데이터 ---
 const ORGANIZATION = {
   '본사': ['보상기획팀', '보상지원팀', 'A&H손해사정지원팀', '고객지원팀'],
   '서울보상부': ['강북대물', '남양주대물', '강남대물', '일산대물', '서울외제차', '강원보상', '동부대인', '서부대인'],
@@ -549,18 +549,14 @@ const HomeTab = ({ mood, handleMoodCheck, feeds, onWriteClick, onNavigateToNews,
         onNavigateToFeed(type); 
     };
 
-    // 2. 기분 선택 버튼 스타일 (선택 시 해당 색상 유지, 나머지는 회색 처리)
     const getMoodButtonStyle = (type) => {
         if (mood === type) {
-            // 선택된 항목은 원래 색상을 유지하면서 강조 (Restore original color)
             if (type === 'happy') return 'bg-blue-500 border-blue-600 text-white shadow-md scale-105 ring-2 ring-blue-200';
             if (type === 'soso') return 'bg-yellow-400 border-yellow-500 text-white shadow-md scale-105 ring-2 ring-yellow-200';
             if (type === 'sad') return 'bg-orange-500 border-orange-600 text-white shadow-md scale-105 ring-2 ring-orange-200';
         } else if (mood) {
-            // 다른 것이 선택되었을 때는 회색으로 죽임
             return 'bg-slate-100 border-slate-200 text-slate-300';
         } else {
-            // 아무것도 선택 안 되었을 때는 기본 색상 (약간 투명하게)
             if (type === 'happy') return 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 opacity-90';
             if (type === 'soso') return 'bg-yellow-400 border-yellow-400 text-white hover:bg-yellow-500 opacity-90';
             if (type === 'sad') return 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600 opacity-90';
@@ -1345,8 +1341,6 @@ export default function App() {
         const newPoints = currentUser.points - 10000;
         await supabase.from('profiles').update({ points: newPoints }).eq('id', currentUser.id);
         await supabase.from('point_history').insert({ user_id: currentUser.id, reason: '포인트 차감 신청', amount: 10000, type: 'use' });
-        
-        // 메일 발송 기능 제거됨 (DB 저장만 수행)
         
         fetchUserData(currentUser.id);
         fetchPointHistory(currentUser.id);
