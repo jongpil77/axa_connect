@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Heart, MessageCircle, Gift, Bell, Sparkles, Smile, Frown, Meh, Megaphone, X, Send, Settings, ChevronRight, LogOut, Image as ImageIcon, Coins, Pencil, Trash2, Loader2, Lock, Clock, Award, Wallet, Building2, CornerDownRight, Link as LinkIcon, MapPin, Search, Key, Edit3, ClipboardList, CheckSquare, ChevronLeft } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-// --- [Required] Supabase Configuration ---
+// --- [필수] Supabase 설정 ---
 const SUPABASE_URL = 'https://clsvsqiikgnreqqvcrxj.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsc3ZzcWlpa2ducmVxcXZjcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNzcyNjAsImV4cCI6MjA4MDk1MzI2MH0.lsaycyp6tXjLwb-qB5PIQ0OqKweTWO3WaxZG5GYOUqk';
 
-// --- Constant Data ---
+// --- 상수 데이터 ---
 const ORGANIZATION = {
   '본사': ['보상기획팀', '보상지원팀', 'A&H손해사정지원팀', '고객지원팀'],
   '서울보상부': ['강북대물', '남양주대물', '강남대물', '일산대물', '서울외제차', '강원보상', '동부대인', '서부대인'],
@@ -236,7 +236,6 @@ const Header = ({ currentUser, onOpenUserInfo, handleLogout, onOpenChangeDept, o
         </div>
         
         <div className="flex items-center gap-2 relative">
-          {/* 포인트 표시 UI 수정: 두 줄로 변경 */}
           <div className="bg-white text-slate-600 px-3 py-1.5 rounded-2xl text-xs font-bold flex items-center gap-2 border border-slate-100 shadow-sm">
              <Coins className="w-6 h-6 text-yellow-400 fill-yellow-400" />
              <div className="flex flex-col items-start leading-none">
@@ -823,10 +822,14 @@ const FeedTab = ({ feeds, activeFeedFilter, setActiveFeedFilter, onWriteClick, c
                 
                 {feed.type === 'praise' && feed.target_name && <p className="text-xs font-bold text-green-600 mb-1">To. {feed.target_name}</p>}
                 
-                <h3 className="text-base font-bold text-slate-800 mb-1.5">
-                    {feed.title || '제목 없음'}
-                    {isToday(feed.created_at) && <span className="ml-1 px-1 py-0.5 bg-red-500 text-white text-[8px] font-bold rounded-sm inline-block">NEW</span>}
-                </h3>
+                {/* 칭찬 게시글 제목 처리: 제목이 있으면 출력하고, 없으면 아예 렌더링하지 않음 */}
+                {feed.title && (
+                    <h3 className="text-base font-bold text-slate-800 mb-1.5">
+                        {feed.title}
+                        {isToday(feed.created_at) && <span className="ml-1 px-1 py-0.5 bg-red-500 text-white text-[8px] font-bold rounded-sm inline-block">NEW</span>}
+                    </h3>
+                )}
+
                 <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{feed.content}</p>
                 {feed.link_url && (
                     <a href={feed.link_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-blue-500 bg-blue-50 px-2 py-1.5 rounded-lg hover:underline w-full truncate">
@@ -876,7 +879,114 @@ const FeedTab = ({ feeds, activeFeedFilter, setActiveFeedFilter, onWriteClick, c
   );
 };
 
-// 1. RankingTab: 날짜 선택 및 과거 랭킹 조회 기능 추가
+const WriteModal = ({ setShowWriteModal, handlePostSubmit, currentUser, activeTab }) => {
+  const [writeCategory, setWriteCategory] = useState('');
+  const [imagePreview, setImagePreview] = useState(null);
+  const [regionMain, setRegionMain] = useState('');
+  const [regionSub, setRegionSub] = useState('');
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) setImagePreview(URL.createObjectURL(file));
+  };
+  
+  // useMemo를 사용하여 categories 배열을 메모이제이션
+  const categories = useMemo(() => [
+    {id: 'praise', label: '칭찬하기', show: activeTab !== 'news'},
+    {id: 'matjib', label: '맛집소개', show: activeTab !== 'news'},
+    {id: 'knowhow', label: '업무꿀팁', show: activeTab !== 'news'},
+    {id: 'news', label: '공지사항', show: activeTab === 'news' && currentUser?.role === 'admin'}
+  ].filter(c => c.show), [activeTab, currentUser]); // 의존성 배열에 activeTab과 currentUser 추가
+
+  useEffect(() => {
+      if (categories.length > 0 && !writeCategory) {
+          setWriteCategory(categories[0].id);
+      }
+  }, [categories, writeCategory]);
+
+  const showPointReward = ['praise', 'knowhow', 'matjib'].includes(writeCategory);
+  const pointRewardText = showPointReward ? ' (+100P)' : '';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="bg-white w-full max-w-md rounded-[2.5rem] p-0 shadow-2xl max-h-[90vh] overflow-y-auto relative">
+        <div className="bg-slate-800 p-6 rounded-t-[2.5rem] flex justify-between items-center sticky top-0 z-10">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2"><Pencil className="w-5 h-5"/> 글쓰기</h3>
+            <button onClick={() => setShowWriteModal(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-6">
+            <form onSubmit={handlePostSubmit}>
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                {categories.map((cat) => (
+                    <label key={cat.id} className="flex-shrink-0 cursor-pointer">
+                        <input type="radio" name="category" value={cat.id} className="peer hidden" checked={writeCategory === cat.id} onChange={() => setWriteCategory(cat.id)} />
+                        <span className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center ${writeCategory === cat.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}>{cat.label}</span>
+                    </label>
+                ))}
+            </div>
+            
+            <div className="space-y-4 mb-8">
+                {writeCategory === 'praise' && (
+                    <div className="bg-green-50 p-4 rounded-2xl border border-green-100 animate-fade-in">
+                        <label className="text-xs font-bold text-green-700 block mb-2 ml-1">누구를 칭찬하나요?</label>
+                        <input name="targetName" type="text" placeholder="이름을 입력하세요 (예: 김철수)" className="w-full bg-white p-3 rounded-xl border border-green-200 text-sm outline-none focus:border-green-500" required />
+                    </div>
+                )}
+
+                {writeCategory === 'matjib' && (
+                    <div className="space-y-3 animate-fade-in">
+                        <input name="title" type="text" placeholder="맛집 이름 (제목)" className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 font-bold" required />
+                        <div className="grid grid-cols-2 gap-2">
+                             <select name="regionMain" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" onChange={(e) => setRegionMain(e.target.value)} required>
+                                 <option value="">시/도 선택</option>
+                                 {Object.keys(REGIONS).map(r => <option key={r} value={r}>{r}</option>)}
+                             </select>
+                             <select name="regionSub" value={regionSub} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" disabled={!regionMain} onChange={(e) => setRegionSub(e.target.value)} required>
+                                 <option value="">시/군/구 선택</option>
+                                 {regionMain && REGIONS[regionMain].map(r => <option key={r} value={r}>{r}</option>)}
+                             </select>
+                        </div>
+                        <input name="linkUrl" type="url" placeholder="지도 링크나 블로그 주소 (선택)" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 text-slate-600" />
+                    </div>
+                )}
+
+                {(writeCategory === 'knowhow' || writeCategory === 'news') && (
+                    <div className="animate-fade-in">
+                        <input name="title" type="text" placeholder="제목을 입력하세요" className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 font-bold mb-3" required />
+                    </div>
+                )}
+
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <textarea name="content" className="w-full h-32 bg-transparent text-sm outline-none resize-none placeholder-slate-400" placeholder={writeCategory === 'praise' ? "칭찬 내용을 작성해주세요..." : "내용을 자세히 작성해주세요..."} required></textarea>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <label className="cursor-pointer flex items-center justify-center w-20 h-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl hover:border-blue-400 hover:bg-blue-50 transition-all">
+                        <div className="text-center">
+                            <ImageIcon className="w-6 h-6 text-slate-400 mx-auto mb-1" />
+                            <span className="text-[10px] text-slate-400">사진</span>
+                        </div>
+                        <input type="file" name="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                    </label>
+                    {imagePreview && (
+                        <div className="w-20 h-20 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group">
+                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => setImagePreview(null)} className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center text-white"><X className="w-5 h-5"/></button>
+                        </div>
+                    )}
+                </div>
+            </div>
+            
+            <button type="submit" className="w-full bg-slate-800 text-white p-4 rounded-2xl text-sm font-bold hover:bg-slate-900 shadow-lg transition-all flex items-center justify-center gap-2">
+                등록하기 <span className="text-yellow-400 bg-white/10 px-1.5 py-0.5 rounded text-xs">{pointRewardText}</span>
+            </button>
+            </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const RankingTab = ({ feeds, profiles, allPointHistory }) => {
     const [selectedDate, setSelectedDate] = useState(new Date());
 
