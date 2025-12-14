@@ -1214,14 +1214,6 @@ export default function App() {
         const { data: comments } = await supabase.from('comments').select(`*, profiles:author_id (name, role)`).order('created_at', { ascending: true });
 
         if (posts) {
-            const buildCommentTree = (postComments) => {
-                const commentMap = {};
-                const rootComments = [];
-                postComments.forEach(c => { commentMap[c.id] = { ...c, replies: [] }; });
-                postComments.forEach(c => { rootComments.push(commentMap[c.id]); });
-                return rootComments;
-            };
-
             const formatted = posts.map(post => {
                 const postComments = comments ? comments.filter(c => c.post_id === post.id) : [];
                 const createdDate = new Date(post.created_at);
@@ -1239,7 +1231,7 @@ export default function App() {
                     formattedTime: formattedTime, 
                     likes: post.likes ? (typeof post.likes === 'string' ? JSON.parse(post.likes) : post.likes) : [], 
                     isLiked: false,
-                    comments: buildCommentTree(postComments), 
+                    comments: postComments, 
                     totalComments: postComments.length 
                 };
             });
@@ -1346,7 +1338,7 @@ export default function App() {
               post_id: postId, author_id: currentUser.id, content: content, parent_id: parentId 
           });
           e.target.reset();
-          setTimeout(fetchFeeds, 500); 
+          // fetchFeeds(); // 실시간 리스너가 처리하므로 수동 호출 제거
       } catch (err) { console.error('댓글 작성 실패: ', err.message); }
   };
   
@@ -1354,7 +1346,7 @@ export default function App() {
       if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
       try {
           await supabase.from('comments').delete().eq('id', commentId);
-          setTimeout(fetchFeeds, 500);
+          // fetchFeeds(); // 실시간 리스너가 처리하므로 수동 호출 제거
       } catch (err) { console.error('삭제 실패: ', err.message); }
   };
 
