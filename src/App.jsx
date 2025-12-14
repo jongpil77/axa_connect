@@ -31,7 +31,7 @@ const REGIONS = {
     '제주': ['제주시', '서귀포시']  
 };
 
-const INITIAL_POINTS = 3000; 
+const INITIAL_POINTS = 1000; 
 const AXA_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/9/94/AXA_Logo.svg"; 
 const ADMIN_EMAIL = "jongpil.kim@axa.co.kr"; 
 
@@ -464,6 +464,7 @@ const BirthdayPopup = ({ currentUser, handleBirthdayGrant, setShowBirthdayPopup 
             <div className="text-5xl mb-4">
                 <span className="text-6xl animate-pulse">🎂</span>
                 <div className="relative w-12 h-1 bg-yellow-500 mx-auto rounded-full mt-1">
+                    {/* 촛불 효과 */}
                     <div className="absolute top-[-8px] left-1/2 -translate-x-1/2 w-1.5 h-3 bg-white shadow-[0_0_5px_rgba(255,255,0,0.8)] animate-flame"></div>
                 </div>
             </div>
