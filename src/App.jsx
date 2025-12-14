@@ -890,13 +890,13 @@ const WriteModal = ({ setShowWriteModal, handlePostSubmit, currentUser, activeTa
     if (file) setImagePreview(URL.createObjectURL(file));
   };
   
-  // useMemo를 사용하여 categories 배열을 메모이제이션
+  // useMemo를 사용하여 categories 배열을 메모이제이션 (모바일 흰 화면 해결)
   const categories = useMemo(() => [
     {id: 'praise', label: '칭찬하기', show: activeTab !== 'news'},
     {id: 'matjib', label: '맛집소개', show: activeTab !== 'news'},
     {id: 'knowhow', label: '업무꿀팁', show: activeTab !== 'news'},
     {id: 'news', label: '공지사항', show: activeTab === 'news' && currentUser?.role === 'admin'}
-  ].filter(c => c.show), [activeTab, currentUser]); // 의존성 배열에 activeTab과 currentUser 추가
+  ].filter(c => c.show), [activeTab, currentUser]); 
 
   useEffect(() => {
       if (categories.length > 0 && !writeCategory) {
@@ -1332,22 +1332,75 @@ export default function App() {
       e.preventDefault();
       const content = e.target.commentContent.value;
       if (!content || !currentUser) return;
-      
+
+      // 1. Optimistic Update (Immediate UI feedback)
+      const tempComment = {
+          id: `temp-${Date.now()}`,
+          post_id: postId,
+          author_id: currentUser.id,
+          content: content,
+          parent_id: parentId,
+          created_at: new Date().toISOString(),
+          profiles: {
+              name: currentUser.name,
+              role: currentUser.role
+          }
+      };
+
+      setFeeds(prevFeeds => prevFeeds.map(feed => {
+          if (feed.id === postId) {
+              return {
+                  ...feed,
+                  comments: [...feed.comments, tempComment],
+                  totalComments: feed.totalComments + 1
+              };
+          }
+          return feed;
+      }));
+
+      e.target.reset(); // Clear input
+
+      // 2. Actual DB Insert
       try {
-          await supabase.from('comments').insert({ 
+          const { error } = await supabase.from('comments').insert({ 
               post_id: postId, author_id: currentUser.id, content: content, parent_id: parentId 
           });
-          e.target.reset();
-          // fetchFeeds(); // 실시간 리스너가 처리하므로 수동 호출 제거
-      } catch (err) { console.error('댓글 작성 실패: ', err.message); }
+          
+          if (error) throw error;
+          
+          // No manual fetchFeeds() here. 
+          // The Realtime subscription will receive the 'INSERT' event and trigger fetchFeeds() 
+          // which will replace the temp comment with the real one.
+      } catch (err) { 
+          console.error('Comment failed:', err);
+          // Revert optimistic update if failed (optional but good practice)
+          // For simplicity, we might just trigger a fetch to sync.
+          fetchFeeds(); 
+      }
   };
   
   const handleDeleteComment = async (commentId) => {
       if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
+
+      // Optimistic Update for deletion
+      setFeeds(prevFeeds => prevFeeds.map(feed => {
+          const updatedComments = feed.comments.filter(c => c.id !== commentId);
+          if (updatedComments.length !== feed.comments.length) {
+              return {
+                  ...feed,
+                  comments: updatedComments,
+                  totalComments: updatedComments.length
+              };
+          }
+          return feed;
+      }));
+
       try {
           await supabase.from('comments').delete().eq('id', commentId);
-          // fetchFeeds(); // 실시간 리스너가 처리하므로 수동 호출 제거
-      } catch (err) { console.error('삭제 실패: ', err.message); }
+      } catch (err) { 
+          console.error('Delete failed:', err); 
+          fetchFeeds(); // Revert on failure
+      }
   };
 
   const handleDeletePost = async (postId) => {
