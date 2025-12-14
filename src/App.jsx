@@ -31,16 +31,14 @@ const REGIONS = {
     '제주': ['제주시', '서귀포시']  
 };
 
-const INITIAL_POINTS = 1000; 
+const INITIAL_POINTS = 3000; 
 const AXA_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/9/94/AXA_Logo.svg"; 
 const ADMIN_EMAIL = "jongpil.kim@axa.co.kr"; 
 
 // --- Helper Functions ---
 const formatName = (name) => {
   if (!name) return '';
-  if (/[가-힣]{2,}/.test(name)) {
-      return name.substring(1); 
-  }
+  if (/[가-힣]{2,}/.test(name)) return name.substring(1); 
   return name; 
 };
 
@@ -108,7 +106,7 @@ const isToday = (timestamp) => {
 const MoodToast = ({ message, emoji, visible }) => {
     if (!visible) return null;
     return (
-        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-up w-[90%] max-w-sm">
+        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-up w-[90%] max-w-sm pointer-events-none">
             <div className="bg-slate-800/90 backdrop-blur-sm text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700">
                 <span className="text-3xl">{emoji}</span>
                 <span className="text-sm font-bold leading-relaxed">{message}</span>
@@ -823,8 +821,8 @@ const FeedTab = ({ feeds, activeFeedFilter, setActiveFeedFilter, onWriteClick, c
                 
                 {feed.type === 'praise' && feed.target_name && <p className="text-xs font-bold text-green-600 mb-1">To. {feed.target_name}</p>}
                 
-                {/* 칭찬 게시글 제목 처리: 제목이 있으면 출력하고, 없으면 아예 렌더링하지 않음 */}
-                {feed.title && (
+                {/* 칭찬 게시글 제목 숨김 처리 (3번 해결) */}
+                {feed.type !== 'praise' && feed.title && (
                     <h3 className="text-base font-bold text-slate-800 mb-1.5">
                         {feed.title}
                         {isToday(feed.created_at) && <span className="ml-1 px-1 py-0.5 bg-red-500 text-white text-[8px] font-bold rounded-sm inline-block">NEW</span>}
@@ -891,19 +889,27 @@ const WriteModal = ({ setShowWriteModal, handlePostSubmit, currentUser, activeTa
     if (file) setImagePreview(URL.createObjectURL(file));
   };
   
-  // useMemo를 사용하여 categories 배열을 메모이제이션 (모바일 흰 화면 해결)
-  const categories = useMemo(() => [
-    {id: 'praise', label: '칭찬하기', show: activeTab !== 'news'},
-    {id: 'matjib', label: '맛집소개', show: activeTab !== 'news'},
-    {id: 'knowhow', label: '업무꿀팁', show: activeTab !== 'news'},
-    {id: 'news', label: '공지사항', show: activeTab === 'news' && currentUser?.role === 'admin'}
-  ].filter(c => c.show), [activeTab, currentUser]); 
+  // 2. useMemo 사용으로 모바일 흰 화면 해결 (렌더링 루프 방지)
+  const categories = useMemo(() => {
+    // 칭찬글 작성 시 제목 필요 없음 처리 등을 위해 카테고리 정의
+    // (여기서는 단순 목록만 반환)
+    const baseCategories = [
+        {id: 'praise', label: '칭찬하기'},
+        {id: 'matjib', label: '맛집소개'},
+        {id: 'knowhow', label: '업무꿀팁'}
+    ];
+    if (activeTab === 'news' && currentUser?.role === 'admin') {
+        baseCategories.push({id: 'news', label: '공지사항'});
+    }
+    return baseCategories;
+  }, [activeTab, currentUser]);
 
+  // 초기 카테고리 설정 (useEffect 대신 useState 초기값 사용 권장하지만, 기존 로직 유지)
   useEffect(() => {
       if (categories.length > 0 && !writeCategory) {
           setWriteCategory(categories[0].id);
       }
-  }, [categories, writeCategory]);
+  }, [categories, writeCategory]); // categories가 useMemo로 고정되어 루프 안 돔
 
   const showPointReward = ['praise', 'knowhow', 'matjib'].includes(writeCategory);
   const pointRewardText = showPointReward ? ' (+100P)' : '';
@@ -1004,12 +1010,11 @@ const RankingTab = ({ feeds, profiles, allPointHistory }) => {
     const handleNextMonth = () => {
         const nextMonth = new Date(selectedDate);
         nextMonth.setMonth(selectedDate.getMonth() + 1);
-        if (nextMonth <= new Date()) { // 미래로 이동 방지
+        if (nextMonth <= new Date()) { 
             setSelectedDate(nextMonth);
         }
     };
 
-    // 2. 월간 획득 포인트 랭킹 계산 (point_history 기반)
     const pointRanking = useMemo(() => {
         const monthlyPoints = {};
         allPointHistory.forEach(record => {
@@ -1027,7 +1032,6 @@ const RankingTab = ({ feeds, profiles, allPointHistory }) => {
             .slice(0, 3);
     }, [allPointHistory, profiles, selectedDate]);
 
-    // 3. 소통왕, 인기왕은 feeds 기준으로 날짜 필터링
     const postCounts = {};
     feeds.filter(f => isSelectedMonth(f.created_at)).forEach(f => {
         postCounts[f.author_id] = (postCounts[f.author_id] || 0) + 1;
@@ -1069,7 +1073,6 @@ const RankingTab = ({ feeds, profiles, allPointHistory }) => {
     return (
         <div className="p-5 space-y-8 pb-28 animate-fade-in bg-blue-50">
             <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-blue-100 text-center relative">
-                {/* 1. 날짜 네비게이션 */}
                 <div className="flex justify-between items-center mb-4 px-2">
                     <button onClick={handlePrevMonth} className="p-1 hover:bg-slate-100 rounded-full"><ChevronLeft className="w-5 h-5 text-slate-400" /></button>
                     <h2 className="text-lg font-black text-slate-800">{selectedDate.getFullYear()}년 {selectedDate.getMonth() + 1}월 랭킹</h2>
@@ -1114,7 +1117,6 @@ export default function App() {
   const [profiles, setProfiles] = useState([]);
   const [feeds, setFeeds] = useState([]);
   const [pointHistory, setPointHistory] = useState([]);
-  // 1. 전체 포인트 히스토리 상태 추가 (랭킹용)
   const [allPointHistory, setAllPointHistory] = useState([]);
   const [redemptionList, setRedemptionList] = useState([]); 
   const [loading, setLoading] = useState(false);
@@ -1198,25 +1200,36 @@ export default function App() {
     } catch (err) { console.error(err); }
   }, [supabase]);
 
-  // 1. 전체 포인트 히스토리 가져오기 (랭킹용)
+  // 전체 포인트 히스토리 가져오기 (랭킹용)
   const fetchAllPointHistory = useCallback(async () => {
       if (!supabase) return;
       try {
-          // 필요한 컬럼만 가져와서 최적화
           const { data } = await supabase.from('point_history').select('user_id, amount, type, created_at');
           if (data) setAllPointHistory(data);
       } catch(err) { console.error(err); }
   }, [supabase]);
 
+  // 1. 단일 쿼리(Single Query)로 게시글+댓글 한 번에 조회 (깜빡임 원천 차단)
   const fetchFeeds = useCallback(async () => {
     if (!supabase) return; 
     try {
-        const { data: posts } = await supabase.from('posts').select(`*, profiles:author_id (name, dept, team, role)`).order('created_at', { ascending: false });
-        const { data: comments } = await supabase.from('comments').select(`*, profiles:author_id (name, role)`).order('created_at', { ascending: true });
+        // Supabase Relationship: posts 테이블에서 comments를 직접 join해서 가져옴
+        const { data: posts } = await supabase.from('posts')
+            .select(`
+                *, 
+                profiles:author_id (name, dept, team, role),
+                comments (
+                    *,
+                    profiles:author_id (name, role)
+                )
+            `)
+            .order('created_at', { ascending: false });
 
         if (posts) {
             const formatted = posts.map(post => {
-                const postComments = comments ? comments.filter(c => c.post_id === post.id) : [];
+                // 댓글 정렬 (오래된 순)
+                const sortedComments = post.comments ? post.comments.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)) : [];
+                
                 const createdDate = new Date(post.created_at);
                 const formattedTime = createdDate.toLocaleDateString('ko-KR', {
                     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -1232,10 +1245,11 @@ export default function App() {
                     formattedTime: formattedTime, 
                     likes: post.likes ? (typeof post.likes === 'string' ? JSON.parse(post.likes) : post.likes) : [], 
                     isLiked: false,
-                    comments: postComments, 
-                    totalComments: postComments.length 
+                    comments: sortedComments, 
+                    totalComments: sortedComments.length 
                 };
             });
+            
             if (currentUser) {
                 formatted.forEach(p => { p.isLiked = p.likes.includes(currentUser.id); });
             }
@@ -1263,6 +1277,7 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return; 
 
+    // Realtime 구독: DB 변경 시 fetchFeeds 호출 (단일 소스)
     const channel = supabase.channel('public:comments_posts')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => { fetchFeeds(); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => { fetchFeeds(); })
@@ -1288,7 +1303,7 @@ export default function App() {
 
         fetchFeeds();
         fetchProfiles();
-        fetchAllPointHistory(); // 전체 포인트 히스토리 로드
+        fetchAllPointHistory(); 
         return () => {
             subscription.unsubscribe();
             supabase.removeChannel(channel);
@@ -1311,7 +1326,7 @@ export default function App() {
         setShowBirthdayPopup(false);
         fetchUserData(currentUser.id);
         fetchPointHistory(currentUser.id);
-        fetchAllPointHistory(); // 랭킹 갱신
+        fetchAllPointHistory(); 
     } catch (err) { console.error('오류 발생: ', err.message); }
   };
 
@@ -1323,18 +1338,20 @@ export default function App() {
       if (isLiked) { newLikes = newLikes.filter(id => id !== userId); } 
       else { newLikes.push(userId); }
       
+      // Optimistic Update
       setFeeds(feeds.map(f => f.id === postId ? { ...f, likes: newLikes, isLiked: !isLiked } : f));
       
       try { await supabase.from('posts').update({ likes: newLikes }).eq('id', postId); } 
       catch (err) { console.error(err); fetchFeeds(); }
   };
 
+  // 1. 댓글 추가: 낙관적 업데이트 적용 (화면 즉시 반영 + 수동 fetch 제거)
   const handleAddComment = async (e, postId, parentId = null) => {
       e.preventDefault();
       const content = e.target.commentContent.value;
       if (!content || !currentUser) return;
 
-      // 1. Optimistic Update (Immediate UI feedback)
+      // Optimistic Update: 가짜 댓글을 즉시 화면에 그림
       const tempComment = {
           id: `temp-${Date.now()}`,
           post_id: postId,
@@ -1359,31 +1376,24 @@ export default function App() {
           return feed;
       }));
 
-      e.target.reset(); // Clear input
+      e.target.reset(); 
 
-      // 2. Actual DB Insert
       try {
-          const { error } = await supabase.from('comments').insert({ 
+          // DB 저장 (완료되면 Realtime 리스너가 fetchFeeds를 호출하여 진짜 데이터로 교체됨)
+          await supabase.from('comments').insert({ 
               post_id: postId, author_id: currentUser.id, content: content, parent_id: parentId 
           });
-          
-          if (error) throw error;
-          
-          // No manual fetchFeeds() here. 
-          // The Realtime subscription will receive the 'INSERT' event and trigger fetchFeeds() 
-          // which will replace the temp comment with the real one.
       } catch (err) { 
           console.error('Comment failed:', err);
-          // Revert optimistic update if failed (optional but good practice)
-          // For simplicity, we might just trigger a fetch to sync.
-          fetchFeeds(); 
+          fetchFeeds(); // 실패 시 롤백용 fetch
       }
   };
   
+  // 1. 댓글 삭제: 낙관적 업데이트 적용 (화면 즉시 반영 + 수동 fetch 제거)
   const handleDeleteComment = async (commentId) => {
       if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
 
-      // Optimistic Update for deletion
+      // Optimistic Update
       setFeeds(prevFeeds => prevFeeds.map(feed => {
           const updatedComments = feed.comments.filter(c => c.id !== commentId);
           if (updatedComments.length !== feed.comments.length) {
@@ -1400,7 +1410,7 @@ export default function App() {
           await supabase.from('comments').delete().eq('id', commentId);
       } catch (err) { 
           console.error('Delete failed:', err); 
-          fetchFeeds(); // Revert on failure
+          fetchFeeds(); 
       }
   };
 
@@ -1430,9 +1440,9 @@ export default function App() {
 
             await supabase.from('point_history').insert({ user_id: currentUser.id, reason: reasonText, amount: 100, type: 'use' });
             fetchUserData(currentUser.id); 
-            fetchAllPointHistory(); // 랭킹 갱신
+            fetchAllPointHistory(); 
         }
-        fetchFeeds();
+        // fetchFeeds는 Realtime이 처리
     } catch (err) { console.error('삭제 실패: ', err.message); }
   };
 
@@ -1545,9 +1555,9 @@ export default function App() {
             await supabase.from('point_history').insert({ user_id: currentUser.id, reason: reasonText, amount: rewardPoints, type: 'earn' });
         }
         setShowWriteModal(false);
-        fetchFeeds();
+        // fetchFeeds는 Realtime이 처리
         fetchUserData(currentUser.id);
-        fetchAllPointHistory(); // 랭킹 갱신
+        fetchAllPointHistory(); 
     } catch (err) { console.error('작성 실패: ', err.message); }
   };
 
